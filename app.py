@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import time
 
+# Modular tabs
 import dashboard
 import ingredients
 import meal_builder
@@ -43,6 +44,15 @@ INGREDIENTS_FILE = "ingredients.csv"
 BUSINESS_COSTS_FILE = "business_costs.csv"
 
 # --- INITIALIZE DATA ---
+def save_data(df):
+    df.to_csv(DATA_FILE, index=False)
+
+def save_ingredients(df):
+    df.to_csv(INGREDIENTS_FILE, index=False)
+
+def save_business_costs(df):
+    df.to_csv(BUSINESS_COSTS_FILE, index=False)
+
 def initialize_data():
     if os.path.exists(DATA_FILE):
         return pd.read_csv(DATA_FILE)
@@ -61,16 +71,6 @@ def initialize_business_costs():
     else:
         return pd.DataFrame(columns=["Name", "Type", "Amount", "Unit"])
 
-# --- SAVE DATA ---
-def save_data(df):
-    df.to_csv(DATA_FILE, index=False)
-
-def save_ingredients(df):
-    df.to_csv(INGREDIENTS_FILE, index=False)
-
-def save_business_costs(df):
-    df.to_csv(BUSINESS_COSTS_FILE, index=False)
-
 # --- LOAD DATA ---
 if "total_df" not in st.session_state:
     st.session_state.total_df = initialize_data()
@@ -85,16 +85,21 @@ if "business_costs_df" not in st.session_state:
 st.title("📊 Clean Eats Meal Costings")
 st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
 
-tab1, tab2, tab3, tab4 = st.tabs(["💰 Costing Dashboard", "📋 Ingredients", "🍽️ Meals", "⚙️ Business Costs"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "💰 Costing Dashboard",
+    "📋 Ingredients",
+    "🍽️ Meals",
+    "⚙️ Business Costs"
+])
 
 with tab1:
-    dashboard.render(st)
+    dashboard.render()
 
 with tab2:
-    ingredients.render(st)
+    ingredients.render()
 
 with tab3:
-    meal_builder.render(st)
+    meal_builder.render()
 
 with tab4:
-    business_costs.render(st)
+    business_costs.render()
