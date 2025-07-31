@@ -1,7 +1,7 @@
-import pandas as pd
 import streamlit as st
+import pandas as pd
 
-def render(st):
+def render():
     st.header("💰 Costing Dashboard")
     df = st.session_state.total_df.copy()
 
