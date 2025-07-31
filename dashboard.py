@@ -1,8 +1,6 @@
 import pandas as pd
 import streamlit as st
 
-from io import BytesIO
-
 def render(st):
     st.header("💰 Costing Dashboard")
     df = st.session_state.total_df.copy()
@@ -18,29 +16,31 @@ def render(st):
             "Profit Margin": "$ {:.2f}",
             "Margin %": "{:.1f}%"
         }), use_container_width=True)
+
     else:
         st.warning("📂 No costing data yet. You can upload one-time data below to initialise.")
 
-    uploaded_file = st.file_uploader(
-       "Initialise from costing spreadsheet (one-time import)",
-       type=["xlsx"],
-       key="initial_upload"
-    )
-    if uploaded_file:
-        try:
-            raw_df = pd.read_excel(uploaded_file, sheet_name="TOTAL")
-            raw_df = raw_df.rename(columns={
-                "DESCRIPTION MEAL": "Meal",
-                "RAW MATERIAL": "Ingredients",
-                "ROADMAP": "Other Costs",
-                "TOTAL": "Total Cost",
-                "SELL COST": "Sell Price"
-            })
-            clean_df = raw_df[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
-            st.session_state.total_df = clean_df
-            st.success("✅ Data imported and saved!")
-            from app import save_data
-            save_data(clean_df)
-            st.rerun()
-        except Exception as e:
-            st.error(f"❌ Failed to load spreadsheet: {e}")
+        uploaded_file = st.file_uploader(
+            "Initialise from costing spreadsheet (one-time import)",
+            type=["xlsx"],
+            key="dashboard_file_upload"
+        )
+
+        if uploaded_file:
+            try:
+                raw_df = pd.read_excel(uploaded_file, sheet_name="TOTAL")
+                raw_df = raw_df.rename(columns={
+                    "DESCRIPTION MEAL": "Meal",
+                    "RAW MATERIAL": "Ingredients",
+                    "ROADMAP": "Other Costs",
+                    "TOTAL": "Total Cost",
+                    "SELL COST": "Sell Price"
+                })
+                clean_df = raw_df[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
+                st.session_state.total_df = clean_df
+                from app import save_data
+                save_data(clean_df)
+                st.success("✅ Data imported and saved!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ Failed to load spreadsheet: {e}")
