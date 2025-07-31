@@ -124,7 +124,7 @@ with tab2:
     st.divider()
     st.subheader("➕ New Ingredient Entry")
     if "new_entry_df" not in st.session_state:
-        st.session_state.new_entry_df = pd.DataFrame(columns=full_df.columns)
+        st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
 
     edited_new_df = st.data_editor(st.session_state.new_entry_df, num_rows="dynamic", use_container_width=True, key="new_ingredients")
 
@@ -133,7 +133,7 @@ with tab2:
             combined = pd.concat([edited_saved_df, edited_new_df], ignore_index=True)
             combined["Cost per Unit"] = combined.apply(live_cost_per_unit, axis=1)
             st.session_state.ingredients_df = combined
-            st.session_state.new_entry_df = pd.DataFrame(columns=full_df.columns)  # Clear entry form
+            st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
             save_ingredients(combined)
             st.success("✅ Ingredients saved and new entries cleared!")
             st.rerun()
