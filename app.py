@@ -35,6 +35,7 @@ if not st.session_state.authenticated:
 # --- FILE PATHS ---
 DATA_FILE = "stored_total_summary.csv"
 INGREDIENTS_FILE = "ingredients.csv"
+BUSINESS_COSTS_FILE = "business_costs.csv"
 
 # --- INITIALIZE DATA ---
 def initialize_data():
@@ -49,6 +50,12 @@ def initialize_ingredients():
     else:
         return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost per Unit"])
 
+def initialize_business_costs():
+    if os.path.exists(BUSINESS_COSTS_FILE):
+        return pd.read_csv(BUSINESS_COSTS_FILE)
+    else:
+        return pd.DataFrame(columns=["Name", "Type", "Amount", "Unit"])
+
 # --- SAVE DATA ---
 def save_data(df):
     df.to_csv(DATA_FILE, index=False)
@@ -56,12 +63,18 @@ def save_data(df):
 def save_ingredients(df):
     df.to_csv(INGREDIENTS_FILE, index=False)
 
+def save_business_costs(df):
+    df.to_csv(BUSINESS_COSTS_FILE, index=False)
+
 # --- LOAD DATA ---
 if "total_df" not in st.session_state:
     st.session_state.total_df = initialize_data()
 
 if "ingredients_df" not in st.session_state:
     st.session_state.ingredients_df = initialize_ingredients()
+
+if "business_costs_df" not in st.session_state:
+    st.session_state.business_costs_df = initialize_business_costs()
 
 # --- UI LAYOUT ---
 st.title("📊 Clean Eats Meal Costings")
@@ -130,7 +143,6 @@ with tab2:
 
     if st.button("💾 Save Ingredients"):
         with st.spinner("Saving ingredients..."):
-            # Append new entries to saved
             new_df = edited_new_df.copy()
             saved_df = edited_saved_df.copy()
             combined = pd.concat([saved_df, new_df], ignore_index=True)
@@ -144,3 +156,17 @@ with tab2:
 with tab3:
     st.header("🍽️ Meal Builder")
     st.info("This section will allow editing meals, assigning ingredients, and dynamically calculating cost. Coming soon!")
+
+with st.sidebar.expander("⚙️ Business Costs", expanded=False):
+    st.write("Define fixed or variable costs associated with operations")
+
+    saved_costs_df = st.session_state.business_costs_df.copy()
+
+    st.subheader("📦 Saved Business Costs")
+    edited_costs_df = st.data_editor(saved_costs_df, num_rows="dynamic", use_container_width=True, key="saved_business_costs")
+
+    if st.button("💾 Save Business Costs"):
+        with st.spinner("Saving business costs..."):
+            st.session_state.business_costs_df = edited_costs_df
+            save_business_costs(edited_costs_df)
+            st.success("✅ Business costs saved!")
