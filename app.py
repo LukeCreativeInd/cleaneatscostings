@@ -29,8 +29,7 @@ def load_total_summary(uploaded_file):
     st.write("📋 Columns found in uploaded sheet:", df.columns.tolist())
     try:
         df = df.rename(columns={
-            "DESCRIPTION": "Meal",
-            "MEAL": "Raw Cost",
+            "DESCRIPTION MEAL": "Meal",
             "RAW MATERIAL": "Ingredients",
             "ROADMAP": "Other Costs",
             "TOTAL": "Total Cost",
