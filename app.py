@@ -78,10 +78,10 @@ if "business_costs_df" not in st.session_state:
 
 # --- UI LAYOUT ---
 st.title("📊 Clean Eats Meal Costings")
-st.markdown("Use the side panel to view and manage ingredients, meals, and cost breakdowns.")
+st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
 
 # --- TABS ---
-tab1, tab2, tab3 = st.tabs(["💰 Costing Dashboard", "📋 Ingredients", "🍽️ Meals"])
+tab1, tab2, tab3, tab4 = st.tabs(["💰 Costing Dashboard", "📋 Ingredients", "🍽️ Meals", "⚙️ Business Costs"])
 
 with tab1:
     st.header("💰 Costing Dashboard")
@@ -157,7 +157,8 @@ with tab3:
     st.header("🍽️ Meal Builder")
     st.info("This section will allow editing meals, assigning ingredients, and dynamically calculating cost. Coming soon!")
 
-with st.sidebar.expander("⚙️ Business Costs", expanded=False):
+with tab4:
+    st.header("⚙️ Business Costs")
     st.write("Define fixed or variable costs associated with operations")
 
     saved_costs_df = st.session_state.business_costs_df.copy()
