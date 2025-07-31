@@ -26,7 +26,7 @@ if not st.session_state.authenticated:
 @st.cache_data
 def load_total_summary(uploaded_file):
     df = pd.read_excel(uploaded_file, sheet_name="TOTAL")
-    st.write("Columns found in uploaded sheet:", df.columns.tolist())  # 🪵 Debug helper
+    st.write("📋 Columns found in uploaded sheet:", df.columns.tolist())
     try:
         df = df.rename(columns={
             "DESCRIPTION": "Meal",
@@ -38,7 +38,7 @@ def load_total_summary(uploaded_file):
         })
         return df[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
     except KeyError as e:
-        st.error(f\"❌ Missing expected columns. Check column names in your spreadsheet.\\n\\nDetails: {e}\")
+        st.error(f"❌ Missing expected columns. Check column names in your spreadsheet.\n\nDetails: {e}")
         return pd.DataFrame()
 
 # --- UI LAYOUT ---
@@ -53,16 +53,17 @@ with tab1:
     uploaded_file = st.file_uploader("Upload the costing spreadsheet", type=["xlsx"])
     if uploaded_file:
         df = load_total_summary(uploaded_file)
-        df["Profit Margin"] = df["Sell Price"] - df["Total Cost"]
-        df["Margin %"] = (df["Profit Margin"] / df["Sell Price"]) * 100
-        st.dataframe(df.style.format({
-            "Ingredients": "$ {:.2f}",
-            "Other Costs": "$ {:.2f}",
-            "Total Cost": "$ {:.2f}",
-            "Sell Price": "$ {:.2f}",
-            "Profit Margin": "$ {:.2f}",
-            "Margin %": "{:.1f}%"
-        }), use_container_width=True)
+        if not df.empty:
+            df["Profit Margin"] = df["Sell Price"] - df["Total Cost"]
+            df["Margin %"] = (df["Profit Margin"] / df["Sell Price"]) * 100
+            st.dataframe(df.style.format({
+                "Ingredients": "$ {:.2f}",
+                "Other Costs": "$ {:.2f}",
+                "Total Cost": "$ {:.2f}",
+                "Sell Price": "$ {:.2f}",
+                "Profit Margin": "$ {:.2f}",
+                "Margin %": "{:.1f}%"
+            }), use_container_width=True)
     else:
         st.warning("📂 Please upload the costing spreadsheet to begin.")
 
