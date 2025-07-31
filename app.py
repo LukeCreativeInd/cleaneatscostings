@@ -107,7 +107,7 @@ with tab1:
 with tab2:
     st.header("📋 Ingredient Manager")
 
-    ing_df = st.session_state.ingredients_df.copy()
+    full_df = st.session_state.ingredients_df.copy()
 
     def live_cost_per_unit(row):
         try:
@@ -115,15 +115,24 @@ with tab2:
         except (ValueError, ZeroDivisionError, TypeError):
             return None
 
-    if not ing_df.empty:
-        ing_df["Cost per Unit"] = ing_df.apply(live_cost_per_unit, axis=1)
+    saved_df = full_df.dropna(subset=["Ingredient"]).copy()
+    saved_df["Cost per Unit"] = saved_df.apply(live_cost_per_unit, axis=1)
+    new_df = pd.DataFrame(columns=full_df.columns)
 
-    edited_df = st.data_editor(ing_df, num_rows="dynamic", use_container_width=True, key="ingredient_editor")
+    st.subheader("🗃️ Saved Ingredients")
+    edited_saved_df = st.data_editor(saved_df, num_rows="dynamic", use_container_width=True, key="saved_ingredients")
+
+    st.divider()
+    st.subheader("➕ New Ingredient Entry")
+    edited_new_df = st.data_editor(new_df, num_rows="dynamic", use_container_width=True, key="new_ingredients")
 
     if st.button("💾 Save Ingredients"):
-        st.session_state.ingredients_df = edited_df
-        save_ingredients(edited_df)
+        combined = pd.concat([edited_saved_df, edited_new_df], ignore_index=True)
+        combined["Cost per Unit"] = combined.apply(live_cost_per_unit, axis=1)
+        st.session_state.ingredients_df = combined
+        save_ingredients(combined)
         st.success("✅ Ingredients saved!")
+        st.rerun()
 
 with tab3:
     st.header("🍽️ Meal Builder")
