@@ -26,15 +26,20 @@ if not st.session_state.authenticated:
 @st.cache_data
 def load_total_summary(uploaded_file):
     df = pd.read_excel(uploaded_file, sheet_name="TOTAL")
-    df = df.rename(columns={
-        "DESCRIPTION": "Meal",
-        "MEAL": "Raw Cost",
-        "RAW MATERIAL": "Ingredients",
-        "ROADMAP": "Other Costs",
-        "TOTAL": "Total Cost",
-        "SELL COST": "Sell Price"
-    })
-    return df[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
+    st.write("Columns found in uploaded sheet:", df.columns.tolist())  # 🪵 Debug helper
+    try:
+        df = df.rename(columns={
+            "DESCRIPTION": "Meal",
+            "MEAL": "Raw Cost",
+            "RAW MATERIAL": "Ingredients",
+            "ROADMAP": "Other Costs",
+            "TOTAL": "Total Cost",
+            "SELL COST": "Sell Price"
+        })
+        return df[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
+    except KeyError as e:
+        st.error(f\"❌ Missing expected columns. Check column names in your spreadsheet.\\n\\nDetails: {e}\")
+        return pd.DataFrame()
 
 # --- UI LAYOUT ---
 st.title("📊 Clean Eats Meal Costings")
