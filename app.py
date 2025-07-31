@@ -161,21 +161,29 @@ with tab3:
 
     meal_name = st.text_input("Meal Name")
 
-    if "meal_ingredients" not in st.session_state:
-        st.session_state.meal_ingredients = pd.DataFrame(columns=["Ingredient", "Quantity per Meal"])
+    if "meal_rows" not in st.session_state:
+        st.session_state.meal_rows = []
 
     st.subheader("🧪 Assign Ingredients")
-    st.session_state.meal_ingredients = st.data_editor(
-        st.session_state.meal_ingredients,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="meal_ingredient_editor"
-    )
 
-    # Calculate Ingredient Cost
+    cols = st.columns([3, 2, 1])
+    with cols[0]:
+        selected_ingredient = st.selectbox("Ingredient", ingredients_df["Ingredient"].unique(), key="ingredient_select")
+    with cols[1]:
+        quantity = st.number_input("Qty per Meal", min_value=0.0, step=1.0, key="ingredient_qty")
+    with cols[2]:
+        if st.button("➕ Add"):
+            st.session_state.meal_rows.append({
+                "Ingredient": selected_ingredient,
+                "Quantity per Meal": quantity
+            })
+
+    meal_df = pd.DataFrame(st.session_state.meal_rows)
+    st.dataframe(meal_df, use_container_width=True)
+
     def calculate_ingredient_cost():
         total = 0
-        for _, row in st.session_state.meal_ingredients.iterrows():
+        for _, row in meal_df.iterrows():
             match = ingredients_df[ingredients_df["Ingredient"] == row["Ingredient"]]
             if not match.empty:
                 cpu = match.iloc[0]["Cost per Unit"]
@@ -200,7 +208,7 @@ with tab3:
         with st.spinner("Saving meal..."):
             ingredients_summary = ", ".join([
                 f"{row['Ingredient']} ({row['Quantity per Meal']})"
-                for _, row in st.session_state.meal_ingredients.iterrows()
+                for _, row in meal_df.iterrows()
                 if pd.notna(row['Ingredient']) and pd.notna(row['Quantity per Meal'])
             ])
 
@@ -215,10 +223,10 @@ with tab3:
             st.session_state.total_df = pd.concat([st.session_state.total_df, new_entry], ignore_index=True)
             save_data(st.session_state.total_df)
             st.success("✅ Meal saved!")
-            st.session_state.meal_ingredients = pd.DataFrame(columns=["Ingredient", "Quantity per Meal"])
+            st.session_state.meal_rows = []
             st.rerun()
 
-with tab4:
+
     st.header("⚙️ Business Costs")
     st.write("Define fixed or variable costs associated with operations")
 
@@ -231,4 +239,4 @@ with tab4:
         with st.spinner("Saving business costs..."):
             st.session_state.business_costs_df = edited_costs_df
             save_business_costs(edited_costs_df)
-            st.success("✅ Business costs saved!") 
+            st.success("✅ Business costs saved!")
