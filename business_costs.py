@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-def render(st):
+def render():
     st.header("⚙️ Business Costs")
     st.write("Define fixed or variable costs associated with operations")
 
