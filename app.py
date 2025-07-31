@@ -130,11 +130,14 @@ with tab2:
 
     if st.button("💾 Save Ingredients"):
         with st.spinner("Saving ingredients..."):
-            combined = pd.concat([edited_saved_df, edited_new_df], ignore_index=True)
+            # Append new entries to saved
+            new_df = edited_new_df.copy()
+            saved_df = edited_saved_df.copy()
+            combined = pd.concat([saved_df, new_df], ignore_index=True)
             combined["Cost per Unit"] = combined.apply(live_cost_per_unit, axis=1)
             st.session_state.ingredients_df = combined
-            st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
             save_ingredients(combined)
+            st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
             st.success("✅ Ingredients saved and new entries cleared!")
             st.rerun()
 
