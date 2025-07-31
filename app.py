@@ -103,7 +103,12 @@ with tab2:
 
     if st.button("💾 Save Ingredients"):
         if not edited_df.empty:
-            edited_df["Cost per Unit"] = edited_df.apply(lambda row: round(row["Cost"] / row["Purchase Size"], 4) if row["Purchase Size"] else 0, axis=1)
+            def safe_cost_per_unit(row):
+                try:
+                    return round(float(row["Cost"]) / float(row["Purchase Size"]), 4)
+                except (ValueError, ZeroDivisionError, TypeError):
+                    return 0.0
+            edited_df["Cost per Unit"] = edited_df.apply(safe_cost_per_unit, axis=1)
         st.session_state.ingredients_df = edited_df
         save_ingredients(edited_df)
         st.success("✅ Ingredients saved!")
