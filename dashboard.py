@@ -21,7 +21,11 @@ def render(st):
     else:
         st.warning("📂 No costing data yet. You can upload one-time data below to initialise.")
 
-    uploaded_file = st.file_uploader("Initialise from costing spreadsheet (one-time import)", type=["xlsx"])
+    uploaded_file = st.file_uploader(
+       "Initialise from costing spreadsheet (one-time import)",
+       type=["xlsx"],
+       key="initial_upload"
+    )
     if uploaded_file:
         try:
             raw_df = pd.read_excel(uploaded_file, sheet_name="TOTAL")
