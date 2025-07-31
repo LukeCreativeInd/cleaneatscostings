@@ -23,8 +23,9 @@ if not st.session_state.authenticated:
                 st.error("Incorrect password")
     st.stop()
 
-# --- FILE PATH ---
+# --- FILE PATHS ---
 DATA_FILE = "stored_total_summary.csv"
+INGREDIENTS_FILE = "ingredients.csv"
 
 # --- INITIALIZE DATA ---
 def initialize_data():
@@ -33,13 +34,25 @@ def initialize_data():
     else:
         return pd.DataFrame(columns=["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"])
 
+def initialize_ingredients():
+    if os.path.exists(INGREDIENTS_FILE):
+        return pd.read_csv(INGREDIENTS_FILE)
+    else:
+        return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost per Unit"])
+
 # --- SAVE DATA ---
 def save_data(df):
     df.to_csv(DATA_FILE, index=False)
 
+def save_ingredients(df):
+    df.to_csv(INGREDIENTS_FILE, index=False)
+
 # --- LOAD DATA ---
 if "total_df" not in st.session_state:
     st.session_state.total_df = initialize_data()
+
+if "ingredients_df" not in st.session_state:
+    st.session_state.ingredients_df = initialize_ingredients()
 
 # --- UI LAYOUT ---
 st.title("📊 Clean Eats Meal Costings")
@@ -84,7 +97,16 @@ with tab1:
 
 with tab2:
     st.header("📋 Ingredient Manager")
-    st.info("This section will allow editing of ingredient name, unit, cost per purchase, and calculate cost per gram/mL/unit. Coming soon!")
+
+    ing_df = st.session_state.ingredients_df.copy()
+    edited_df = st.data_editor(ing_df, num_rows="dynamic", use_container_width=True, key="ingredient_editor")
+
+    if st.button("💾 Save Ingredients"):
+        if not edited_df.empty:
+            edited_df["Cost per Unit"] = edited_df.apply(lambda row: round(row["Cost"] / row["Purchase Size"], 4) if row["Purchase Size"] else 0, axis=1)
+        st.session_state.ingredients_df = edited_df
+        save_ingredients(edited_df)
+        st.success("✅ Ingredients saved!")
 
 with tab3:
     st.header("🍽️ Meal Builder")
