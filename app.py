@@ -16,9 +16,9 @@ if not st.session_state.authenticated:
         input_pw = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Enter")
         if submitted:
-            if input_pw == password:
-                st.session_state.authenticated = True
-                st.experimental_rerun()
+           if input_pw == password:
+             st.session_state.authenticated = True
+             st.rerun()
             else:
                 st.error("Incorrect password")
     st.stop()
