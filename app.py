@@ -155,7 +155,68 @@ with tab2:
 
 with tab3:
     st.header("🍽️ Meal Builder")
-    st.info("This section will allow editing meals, assigning ingredients, and dynamically calculating cost. Coming soon!")
+
+    ingredients_df = st.session_state.ingredients_df.copy()
+    business_df = st.session_state.business_costs_df.copy()
+
+    meal_name = st.text_input("Meal Name")
+
+    if "meal_ingredients" not in st.session_state:
+        st.session_state.meal_ingredients = pd.DataFrame(columns=["Ingredient", "Quantity per Meal"])
+
+    st.subheader("🧪 Assign Ingredients")
+    st.session_state.meal_ingredients = st.data_editor(
+        st.session_state.meal_ingredients,
+        num_rows="dynamic",
+        use_container_width=True,
+        key="meal_ingredient_editor"
+    )
+
+    # Calculate Ingredient Cost
+    def calculate_ingredient_cost():
+        total = 0
+        for _, row in st.session_state.meal_ingredients.iterrows():
+            match = ingredients_df[ingredients_df["Ingredient"] == row["Ingredient"]]
+            if not match.empty:
+                cpu = match.iloc[0]["Cost per Unit"]
+                qty = row["Quantity per Meal"]
+                try:
+                    total += float(cpu) * float(qty)
+                except:
+                    continue
+        return round(total, 2)
+
+    ingredient_cost = calculate_ingredient_cost()
+    business_cost = round(business_df["Amount"].sum(), 2)
+    total_cost = round(ingredient_cost + business_cost, 2)
+
+    st.markdown(f"**Ingredient Cost:** ${ingredient_cost:.2f}")
+    st.markdown(f"**Business Cost Applied:** ${business_cost:.2f}")
+    st.markdown(f"**Total Cost:** ${total_cost:.2f}")
+
+    sell_price = st.number_input("Sell Price", min_value=0.0, value=0.0, step=0.5)
+
+    if st.button("💾 Save Meal"):
+        with st.spinner("Saving meal..."):
+            ingredients_summary = ", ".join([
+                f"{row['Ingredient']} ({row['Quantity per Meal']})"
+                for _, row in st.session_state.meal_ingredients.iterrows()
+                if pd.notna(row['Ingredient']) and pd.notna(row['Quantity per Meal'])
+            ])
+
+            new_entry = pd.DataFrame([{
+                "Meal": meal_name,
+                "Ingredients": ingredient_cost,
+                "Other Costs": business_cost,
+                "Total Cost": total_cost,
+                "Sell Price": sell_price
+            }])
+
+            st.session_state.total_df = pd.concat([st.session_state.total_df, new_entry], ignore_index=True)
+            save_data(st.session_state.total_df)
+            st.success("✅ Meal saved!")
+            st.session_state.meal_ingredients = pd.DataFrame(columns=["Ingredient", "Quantity per Meal"])
+            st.rerun()
 
 with tab4:
     st.header("⚙️ Business Costs")
