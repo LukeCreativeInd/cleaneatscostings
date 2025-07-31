@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-def render(st):
+def render():
     st.header("🍽️ Meal Builder")
 
     ingredients_df = st.session_state.ingredients_df.copy()
