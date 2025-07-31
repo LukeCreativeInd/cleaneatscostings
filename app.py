@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import time
 
 # --- AUTH ---
 st.set_page_config(page_title="Clean Eats Costings", layout="wide")
@@ -8,7 +9,14 @@ st.set_page_config(page_title="Clean Eats Costings", layout="wide")
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
+SESSION_TIMEOUT = 3600  # 1 hour
 password = st.secrets["general"]["access_password"]
+
+if 'login_time' in st.session_state:
+    if time.time() - st.session_state.login_time > SESSION_TIMEOUT:
+        st.session_state.authenticated = False
+        st.warning("🔒 Session expired. Please re-enter your password.")
+        st.rerun()
 
 if not st.session_state.authenticated:
     with st.form("login_form"):
@@ -18,6 +26,7 @@ if not st.session_state.authenticated:
         if submitted:
             if input_pw == password:
                 st.session_state.authenticated = True
+                st.session_state.login_time = time.time()
                 st.rerun()
             else:
                 st.error("Incorrect password")
@@ -99,16 +108,19 @@ with tab2:
     st.header("📋 Ingredient Manager")
 
     ing_df = st.session_state.ingredients_df.copy()
+
+    def live_cost_per_unit(row):
+        try:
+            return round(float(row["Cost"]) / float(row["Purchase Size"]), 4)
+        except (ValueError, ZeroDivisionError, TypeError):
+            return None
+
+    if not ing_df.empty:
+        ing_df["Cost per Unit"] = ing_df.apply(live_cost_per_unit, axis=1)
+
     edited_df = st.data_editor(ing_df, num_rows="dynamic", use_container_width=True, key="ingredient_editor")
 
     if st.button("💾 Save Ingredients"):
-        if not edited_df.empty:
-            def safe_cost_per_unit(row):
-                try:
-                    return round(float(row["Cost"]) / float(row["Purchase Size"]), 4)
-                except (ValueError, ZeroDivisionError, TypeError):
-                    return 0.0
-            edited_df["Cost per Unit"] = edited_df.apply(safe_cost_per_unit, axis=1)
         st.session_state.ingredients_df = edited_df
         save_ingredients(edited_df)
         st.success("✅ Ingredients saved!")
