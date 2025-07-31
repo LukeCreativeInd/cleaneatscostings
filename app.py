@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from functools import lru_cache
 
 # --- AUTH ---
 st.set_page_config(page_title="Clean Eats Costings", layout="wide")
@@ -23,10 +22,10 @@ if not st.session_state.authenticated:
                 st.error("Incorrect password")
     st.stop()
 
-# --- LOAD INITIAL DATA ---
-@lru_cache(maxsize=1)
-def load_total_summary():
-    df = pd.read_excel("COSTINGS LUISA 2.0.xlsx", sheet_name="TOTAL")
+# --- LOAD DATA FROM UPLOAD ---
+@st.cache_data
+def load_total_summary(uploaded_file):
+    df = pd.read_excel(uploaded_file, sheet_name="TOTAL")
     df = df.rename(columns={
         "DESCRIPTION": "Meal",
         "MEAL": "Raw Cost",
@@ -46,17 +45,21 @@ tab1, tab2, tab3 = st.tabs(["💰 Costing Dashboard", "📋 Ingredients", "🍽�
 
 with tab1:
     st.header("💰 Costing Dashboard")
-    df = load_total_summary()
-    df["Profit Margin"] = df["Sell Price"] - df["Total Cost"]
-    df["Margin %"] = (df["Profit Margin"] / df["Sell Price"]) * 100
-    st.dataframe(df.style.format({
-        "Ingredients": "$ {:.2f}",
-        "Other Costs": "$ {:.2f}",
-        "Total Cost": "$ {:.2f}",
-        "Sell Price": "$ {:.2f}",
-        "Profit Margin": "$ {:.2f}",
-        "Margin %": "{:.1f}%"
-    }), use_container_width=True)
+    uploaded_file = st.file_uploader("Upload the costing spreadsheet", type=["xlsx"])
+    if uploaded_file:
+        df = load_total_summary(uploaded_file)
+        df["Profit Margin"] = df["Sell Price"] - df["Total Cost"]
+        df["Margin %"] = (df["Profit Margin"] / df["Sell Price"]) * 100
+        st.dataframe(df.style.format({
+            "Ingredients": "$ {:.2f}",
+            "Other Costs": "$ {:.2f}",
+            "Total Cost": "$ {:.2f}",
+            "Sell Price": "$ {:.2f}",
+            "Profit Margin": "$ {:.2f}",
+            "Margin %": "{:.1f}%"
+        }), use_container_width=True)
+    else:
+        st.warning("📂 Please upload the costing spreadsheet to begin.")
 
 with tab2:
     st.header("📋 Ingredient Manager")
