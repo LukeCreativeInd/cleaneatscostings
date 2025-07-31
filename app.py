@@ -231,4 +231,4 @@ with tab4:
         with st.spinner("Saving business costs..."):
             st.session_state.business_costs_df = edited_costs_df
             save_business_costs(edited_costs_df)
-            st.success("✅ Business costs saved!")
+            st.success("✅ Business costs saved!") 
