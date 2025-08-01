@@ -28,14 +28,11 @@ def load_ingredients():
             content = base64.b64decode(resp.json()["content"])
             df = pd.read_csv(io.StringIO(content.decode("utf-8")))
 
-            # Standardize column names
+            # Standardize columns
             df.columns = df.columns.str.strip().str.title()
-
-            # Only keep expected columns
             expected_cols = ["Ingredient", "Unit Type", "Purchase Size", "Cost"]
             df = df[[col for col in df.columns if col in expected_cols]]
 
-            # Save to local CSV for session persistence
             os.makedirs("data", exist_ok=True)
             df.to_csv(DATA_PATH, index=False)
 
@@ -53,11 +50,10 @@ def render():
     st.header("📋 Ingredient Manager")
     st.info("Use this tab to manage ingredients used in meals.\n\n**'Purchase Size'** is how much you buy at once (e.g. 5KG).\n**'Unit Type'** specifies if it's in kilograms, litres, or units.\n**'Cost'** is the total cost for the full purchase size.\n\nThe system calculates cost per unit automatically.")
 
-    if "ingredients_df" not in st.session_state:
-        st.session_state.ingredients_df = load_ingredients()
-
-    full_df = st.session_state.get("ingredients_df", pd.DataFrame())
-    st.write("📦 Loaded ingredient data:", full_df)
+    # Always load the latest data from GitHub on each render
+    ingredients_df = load_ingredients()
+    st.session_state.ingredients_df = ingredients_df
+    full_df = ingredients_df.copy()
 
     def live_cost_per_unit(row):
         try:
@@ -69,16 +65,15 @@ def render():
     saved_df["Cost per Unit"] = saved_df.apply(live_cost_per_unit, axis=1)
 
     st.subheader("🧾 Saved Ingredients")
-    if not saved_df.empty:
+    if saved_df.empty:
+        st.warning("📄 No saved ingredients yet.")
+    else:
         edited_saved_df = st.data_editor(
             saved_df,
             num_rows="dynamic",
             use_container_width=True,
             key="saved_ingredients"
         )
-    else:
-        st.warning("No saved ingredients yet.")
-        edited_saved_df = saved_df
 
     st.divider()
     st.subheader("➕ New Ingredient Entry")
@@ -123,7 +118,7 @@ def render():
 
     if st.button("💾 Save Ingredients"):
         with st.spinner("Saving ingredients..."):
-            combined = pd.concat([edited_saved_df, new_rows], ignore_index=True)
+            combined = pd.concat([saved_df, new_rows], ignore_index=True)
             combined["Cost per Unit"] = combined.apply(live_cost_per_unit, axis=1)
             st.session_state.ingredients_df = combined
 
