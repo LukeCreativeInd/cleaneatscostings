@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import uuid
 import base64
+import io
 import requests
 from utils import save_ingredients_to_github
 
@@ -26,7 +27,7 @@ def load_ingredients():
         resp = requests.get(api_url, headers=headers)
         if resp.status_code == 200:
             content = base64.b64decode(resp.json()["content"])
-            return pd.read_csv(pd.compat.StringIO(content.decode("utf-8")))
+            return pd.read_csv(io.StringIO(content.decode("utf-8")))
     except Exception as e:
         st.warning(f"⚠️ Could not load ingredients from GitHub: {e}")
 
