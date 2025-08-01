@@ -37,7 +37,7 @@ def save_business_costs(df): df.to_csv(BUSINESS_COSTS_FILE, index=False)
 
 # --- LOGIN CHECK ---
 query_params = st.query_params
-logged_in = query_params.get("access", [""])[0] == "ok"
+logged_in = query_params.get("access", "") == "ok"
 
 if not logged_in:
     with st.form("login_form"):
@@ -46,7 +46,7 @@ if not logged_in:
         submitted = st.form_submit_button("Login")
         if submitted:
             if input_pw == password:
-                st.experimental_set_query_params(access="ok")
+                st.query_params = {"access": "ok"}
                 st.rerun()
             else:
                 st.error("Incorrect password")
