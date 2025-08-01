@@ -3,9 +3,18 @@ import pandas as pd
 
 UNIT_TYPE_OPTIONS = ["KG", "L", "Unit"]
 
+import os
+DATA_PATH = "data/ingredients.csv"
+
 def render():
     st.header("📋 Ingredient Manager")
     st.info("Use this tab to manage ingredients used in meals.\n\n**'Purchase Size'** is how much you buy at once (e.g. 5KG).\n**'Unit Type'** specifies if it's in kilograms, litres, or units.\n**'Cost'** is the total cost for the full purchase size.\n\nThe system calculates cost per unit automatically.")
+
+    if "ingredients_df" not in st.session_state:
+        if os.path.exists(DATA_PATH):
+            st.session_state.ingredients_df = pd.read_csv(DATA_PATH)
+        else:
+            st.session_state.ingredients_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
 
     full_df = st.session_state.ingredients_df.copy()
 
