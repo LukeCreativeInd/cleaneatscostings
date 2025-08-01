@@ -36,9 +36,9 @@ def render():
     with st.form("add_ingredient_form"):
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
-        if "ingredient_name" not in st.session_state:
+            if "ingredient_name" not in st.session_state:
             st.session_state["ingredient_name"] = ""
-        name = st.text_input("Ingredient Name", value=st.session_state["ingredient_name"], key="ingredient_name")
+                    name = st.text_input("Ingredient Name", value=st.session_state["ingredient_name"], key="ingredient_name")
         with cols[1]:
             unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS)
         with cols[2]:
