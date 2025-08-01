@@ -5,9 +5,13 @@ BUSINESS_COST_TYPES = [
     "Packaging", "Wages", "Utilities", "Rent", "Transport", "Overheads", "Admin", "Other"
 ]
 
+COST_UNIT_OPTIONS = [
+    "$ / meal", "$ / week", "$ / month", "$", "¢ / meal", "Other"
+]
+
 def render():
     st.header("⚙️ Business Costs")
-    st.write("Define fixed or variable costs associated with operations")
+    st.info("Use this tab to manage recurring or per-meal costs like wages, packaging, rent, and other overheads.\n\n**'Amount'** is the numeric cost value.\n**'Unit'** explains what the amount is based on, such as per meal or per week.")
 
     full_df = st.session_state.business_costs_df.copy()
 
@@ -35,7 +39,7 @@ def render():
         with cols[2]:
             amount = st.number_input("Amount", min_value=0.0, step=1.0)
         with cols[3]:
-            unit = st.text_input("Unit", value="$")
+            unit = st.selectbox("Unit", COST_UNIT_OPTIONS, index=0)
 
         add = st.form_submit_button("➕ Add Cost")
         if add and name and amount:
