@@ -1,3 +1,5 @@
 Ingredient,Unit Type,Purchase Size,Cost,Cost per Unit
 test3,KG,4.0,2.0,0.5
 test5,KG,1.0,1.0,1.0
+test4,KG,1.0,1.0,1.0
+test6,L,1.0,1.0,1.0
