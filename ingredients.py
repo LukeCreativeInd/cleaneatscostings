@@ -59,11 +59,7 @@ def render():
                 "Cost": cost
             }
             st.session_state.new_entry_df = new_rows
-            if "ingredient_name" in st.session_state:
-                del st.session_state["ingredient_name"]
-            st.session_state["ingredient_unit_type"] = UNIT_TYPE_OPTIONS[0]
-            st.session_state["ingredient_purchase_size"] = 0.0
-            st.session_state["ingredient_cost"] = 0.0
+            st.session_state.clear()
             st.rerun()
 
     if not new_rows.empty:
