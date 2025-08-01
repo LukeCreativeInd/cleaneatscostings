@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
+import os
+import uuid
+from utils import save_ingredients_to_github
 
 UNIT_TYPE_OPTIONS = ["KG", "L", "Unit"]
-
-import os
 DATA_PATH = "data/ingredients.csv"
 
 def render():
@@ -42,7 +43,6 @@ def render():
 
     new_rows = st.session_state.new_entry_df.copy()
 
-    import uuid
     if "ingredient_form_key" not in st.session_state:
         st.session_state.ingredient_form_key = str(uuid.uuid4())
 
@@ -83,8 +83,7 @@ def render():
             combined["Cost per Unit"] = combined.apply(live_cost_per_unit, axis=1)
             st.session_state.ingredients_df = combined
 
-            from utils import save_ingredients
-            save_ingredients(combined)
+            save_ingredients_to_github(combined)
 
             st.success("✅ Ingredients saved!")
             st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
