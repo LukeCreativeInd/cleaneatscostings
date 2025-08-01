@@ -33,7 +33,8 @@ def render():
 
     new_rows = st.session_state.new_entry_df.copy()
 
-    with st.form("add_ingredient_form"):
+    form_container = st.empty()
+    with form_container.form("add_ingredient_form"):
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
             name = st.text_input("Ingredient Name", key="ingredient_name")
@@ -56,6 +57,7 @@ def render():
             for key in ["ingredient_name", "ingredient_unit_type", "ingredient_purchase_size", "ingredient_cost"]:
                 if key in st.session_state:
                     del st.session_state[key]
+            form_container.empty()
             st.rerun()
 
     if not new_rows.empty:
