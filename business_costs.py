@@ -50,6 +50,7 @@ def render():
                 "Unit": unit
             }
             st.session_state.new_business_entry_df = new_rows
+            st.rerun()
 
     if not new_rows.empty:
         st.dataframe(new_rows, use_container_width=True)
