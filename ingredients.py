@@ -27,7 +27,13 @@ def load_ingredients():
         resp = requests.get(api_url, headers=headers)
         if resp.status_code == 200:
             content = base64.b64decode(resp.json()["content"])
-            return pd.read_csv(io.StringIO(content.decode("utf-8")))
+            df = pd.read_csv(io.StringIO(content.decode("utf-8")))
+
+            # Save to local CSV for session persistence
+            os.makedirs("data", exist_ok=True)
+            df.to_csv(DATA_PATH, index=False)
+
+            return df
     except Exception as e:
         st.warning(f"⚠️ Could not load ingredients from GitHub: {e}")
 
