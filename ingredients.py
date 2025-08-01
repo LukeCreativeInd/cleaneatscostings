@@ -46,4 +46,4 @@ def render():
             save_ingredients(combined)
             st.success("✅ Ingredients saved!")
             st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
-            st.experimental_rerun()
+            st.rerun()
