@@ -79,4 +79,5 @@ def render():
 
             st.success("✅ Ingredients saved!")
             st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
+            st.session_state.ingredient_form_key = str(uuid.uuid4())
             st.rerun()
