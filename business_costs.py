@@ -64,7 +64,4 @@ def render():
 
             st.success("✅ Business costs saved!")
             st.session_state.new_business_entry_df = pd.DataFrame(columns=["Name", "Type", "Amount", "Unit"])
-
-            import streamlit.runtime.scriptrunner.script_run_context as script_context
-            from streamlit.runtime.scriptrunner import RerunException
-            raise RerunException(script_context.get_script_run_ctx())
+            st.rerun()
