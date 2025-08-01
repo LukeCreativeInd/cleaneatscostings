@@ -13,7 +13,7 @@ import business_costs
 st.set_page_config(page_title="Clean Eats Costings", layout="wide")
 
 # --- SECRETS ---
-password = st.secrets["general"]["access_password"]
+password = st.secrets["access_password"]
 SESSION_TIMEOUT = 3600  # 1 hour
 
 # --- FILE PATHS ---
