@@ -28,7 +28,14 @@ def load_ingredients():
             content = base64.b64decode(resp.json()["content"])
             df = pd.read_csv(io.StringIO(content.decode("utf-8")))
 
-            # Save locally for use in session
+            # Standardize column names
+            df.columns = df.columns.str.strip().str.title()
+
+            # Only keep expected columns
+            expected_cols = ["Ingredient", "Unit Type", "Purchase Size", "Cost"]
+            df = df[[col for col in df.columns if col in expected_cols]]
+
+            # Save to local CSV for session persistence
             os.makedirs("data", exist_ok=True)
             df.to_csv(DATA_PATH, index=False)
 
@@ -39,6 +46,7 @@ def load_ingredients():
     except Exception as e:
         st.warning(f"⚠️ Exception loading ingredients: {e}")
 
+    st.write("🆕 Initialising blank ingredient list")
     return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
 
 def render():
