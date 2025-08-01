@@ -34,20 +34,15 @@ def render():
     new_rows = st.session_state.new_entry_df.copy()
 
     with st.form("add_ingredient_form"):
-        name_container = st.empty()
-        unit_container = st.empty()
-        size_container = st.empty()
-        cost_container = st.empty()
-
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
-            name = name_container.text_input("Ingredient Name")
+            name = st.text_input("Ingredient Name")
         with cols[1]:
-            unit_type = unit_container.selectbox("Unit Type", UNIT_TYPE_OPTIONS)
+            unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS)
         with cols[2]:
-            purchase_size = size_container.number_input("Purchase Size", min_value=0.0, step=0.1)
+            purchase_size = st.number_input("Purchase Size", min_value=0.0, step=0.1)
         with cols[3]:
-            cost = cost_container.number_input("Cost", min_value=0.0, step=0.1)
+            cost = st.number_input("Cost", min_value=0.0, step=0.1)
 
         add = st.form_submit_button("➕ Add Ingredient")
         if add and name and purchase_size:
@@ -58,10 +53,9 @@ def render():
                 "Cost": cost
             }
             st.session_state.new_entry_df = new_rows
-            name_container.empty()
-            unit_container.empty()
-            size_container.empty()
-            cost_container.empty()
+            for key in ["ingredient_name", "ingredient_unit_type", "ingredient_purchase_size", "ingredient_cost"]:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.rerun()
 
     if not new_rows.empty:
