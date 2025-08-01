@@ -10,19 +10,8 @@ from utils import save_ingredients_to_github
 UNIT_TYPE_OPTIONS = ["KG", "L", "Unit"]
 DATA_PATH = "data/ingredients.csv"
 
-
 def load_ingredients():
-    st.write("🔍 Attempting to load ingredients from local file...")
-    if os.path.exists(DATA_PATH):
-        try:
-            df = pd.read_csv(DATA_PATH)
-            st.write("✅ Loaded ingredients from local file.")
-            return df
-        except Exception as e:
-            st.warning(f"⚠️ Failed to load local CSV: {e}")
-
-    st.write("📡 Local file not found. Attempting to load from GitHub...")
-
+    st.write("🔁 Loading ingredients from GitHub...")
     try:
         token = st.secrets["github_token"]
         repo = st.secrets["github_repo"]
@@ -33,26 +22,25 @@ def load_ingredients():
         headers = {"Authorization": f"Bearer {token}"}
         resp = requests.get(api_url, headers=headers)
 
-        st.write(f"📦 GitHub GET {api_url} → Status {resp.status_code}")
+        st.write(f"🔍 GET {api_url} → {resp.status_code}")
 
         if resp.status_code == 200:
             content = base64.b64decode(resp.json()["content"])
             df = pd.read_csv(io.StringIO(content.decode("utf-8")))
 
+            # Save to local CSV for session persistence
             os.makedirs("data", exist_ok=True)
             df.to_csv(DATA_PATH, index=False)
 
-            st.write("✅ Loaded ingredients from GitHub and saved locally.")
+            st.write(f"✅ Ingredients loaded from GitHub: {len(df)} rows")
             return df
         else:
-            st.warning(f"❌ GitHub API failed with status {resp.status_code}")
+            st.warning(f"❌ GitHub API error {resp.status_code}: {resp.text}")
     except Exception as e:
-        st.warning(f"⚠️ Exception while loading ingredients from GitHub: {e}")
+        st.warning(f"⚠️ Exception loading ingredients: {e}")
 
-    st.write("🆕 No ingredients found. Initializing blank dataframe.")
+    st.write("🆕 Initialising blank ingredient list")
     return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
-
-
 
 def render():
     st.header("📋 Ingredient Manager")
