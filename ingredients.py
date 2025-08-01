@@ -39,7 +39,8 @@ def render():
             name = st.text_input("Ingredient Name", key="ingredient_name")
         with cols[1]:
             if "ingredient_unit_type" not in st.session_state:
-                st.session_state["ingredient_unit_type"] = UNIT_TYPE_OPTIONS[0]
+                if "ingredient_unit_type" in st.session_state:
+                del st.session_state["ingredient_unit_type"]
             unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS, index=UNIT_TYPE_OPTIONS.index(st.session_state["ingredient_unit_type"]), key="ingredient_unit_type")
         with cols[2]:
             if "ingredient_purchase_size" not in st.session_state:
