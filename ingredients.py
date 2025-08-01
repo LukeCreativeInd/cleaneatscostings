@@ -37,18 +37,22 @@ def render():
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
             if "ingredient_name" not in st.session_state:
+                if "ingredient_name" in st.session_state:
                 st.session_state["ingredient_name"] = ""
-            name = st.text_input("Ingredient Name", key="ingredient_name")
+            name = st.text_input("Ingredient Name", value=st.session_state.get("ingredient_name", ""), key="ingredient_name")
         with cols[1]:
             if "ingredient_unit_type" not in st.session_state:
+                if "ingredient_unit_type" in st.session_state:
                 st.session_state["ingredient_unit_type"] = UNIT_TYPE_OPTIONS[0]
             unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS, index=UNIT_TYPE_OPTIONS.index(st.session_state["ingredient_unit_type"]), key="ingredient_unit_type")
         with cols[2]:
             if "ingredient_purchase_size" not in st.session_state:
+                if "ingredient_purchase_size" in st.session_state:
                 st.session_state["ingredient_purchase_size"] = 0.0
             purchase_size = st.number_input("Purchase Size", min_value=0.0, step=0.1, key="ingredient_purchase_size")
         with cols[3]:
             if "ingredient_cost" not in st.session_state:
+                if "ingredient_cost" in st.session_state:
                 st.session_state["ingredient_cost"] = 0.0
             cost = st.number_input("Cost", min_value=0.0, step=0.1, key="ingredient_cost")
 
