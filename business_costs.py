@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
 
+BUSINESS_COST_TYPES = [
+    "Packaging", "Wages", "Utilities", "Rent", "Transport", "Overheads", "Admin", "Other"
+]
+
 def render():
     st.header("⚙️ Business Costs")
     st.write("Define fixed or variable costs associated with operations")
@@ -20,19 +24,35 @@ def render():
     if "new_business_entry_df" not in st.session_state:
         st.session_state.new_business_entry_df = pd.DataFrame(columns=["Name", "Type", "Amount", "Unit"])
 
-    edited_new_df = st.data_editor(
-        st.session_state.new_business_entry_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="new_business_costs"
-    )
+    new_rows = st.session_state.new_business_entry_df.copy()
+
+    with st.form("add_cost_form"):
+        cols = st.columns([3, 2, 2, 2])
+        with cols[0]:
+            name = st.text_input("Cost Name")
+        with cols[1]:
+            cost_type = st.selectbox("Type", BUSINESS_COST_TYPES)
+        with cols[2]:
+            amount = st.number_input("Amount", min_value=0.0, step=1.0)
+        with cols[3]:
+            unit = st.text_input("Unit", value="$")
+
+        add = st.form_submit_button("➕ Add Cost")
+        if add and name and amount:
+            new_rows.loc[len(new_rows)] = {
+                "Name": name,
+                "Type": cost_type,
+                "Amount": amount,
+                "Unit": unit
+            }
+            st.session_state.new_business_entry_df = new_rows
+
+    if not new_rows.empty:
+        st.dataframe(new_rows, use_container_width=True)
 
     if st.button("💾 Save Business Costs"):
         with st.spinner("Saving business costs..."):
-            new_df = edited_new_df.copy()
-            saved_df = edited_saved_df.copy()
-
-            combined = pd.concat([saved_df, new_df], ignore_index=True)
+            combined = pd.concat([edited_saved_df, new_rows], ignore_index=True)
             st.session_state.business_costs_df = combined
 
             from app import save_business_costs
