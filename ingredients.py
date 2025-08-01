@@ -33,8 +33,12 @@ def render():
 
     new_rows = st.session_state.new_entry_df.copy()
 
+    import uuid
+    if "ingredient_form_key" not in st.session_state:
+        st.session_state.ingredient_form_key = str(uuid.uuid4())
+
     form_container = st.empty()
-    with form_container.form("add_ingredient_form"):
+    with form_container.form(key=st.session_state.ingredient_form_key):
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
             name = st.text_input("Ingredient Name", key="ingredient_name")
@@ -57,7 +61,7 @@ def render():
             for key in ["ingredient_name", "ingredient_unit_type", "ingredient_purchase_size", "ingredient_cost"]:
                 if key in st.session_state:
                     del st.session_state[key]
-            form_container.empty()
+            st.session_state.ingredient_form_key = str(uuid.uuid4())
             st.rerun()
 
     if not new_rows.empty:
