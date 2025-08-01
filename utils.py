@@ -2,44 +2,72 @@ import os
 import pandas as pd
 import base64
 import requests
-import streamlit as st
+from datetime import datetime
 
 def save_ingredients_to_github(df: pd.DataFrame):
-    # Required secrets: github_token, github_repo, github_branch
+    os.makedirs("data", exist_ok=True)
+    df.to_csv("data/ingredients.csv", index=False)
+
     token = st.secrets["github_token"]
-    repo = st.secrets["github_repo"]  # e.g. 'username/repo'
+    repo = st.secrets["github_repo"]
     branch = st.secrets.get("github_branch", "main")
     path = "data/ingredients.csv"
 
-    # Save CSV locally (optional)
-    os.makedirs("data", exist_ok=True)
-    df.to_csv(path, index=False)
-
-    # Prepare API request to GitHub
     api_url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json"
+    }
 
-    # Get the current SHA of the file (required for updating)
-    headers = {"Authorization": f"Bearer {token}"}
-    sha = None
-    resp = requests.get(api_url, headers=headers)
-    if resp.status_code == 200:
-        sha = resp.json()["sha"]
+    get_resp = requests.get(api_url, headers=headers, params={"ref": branch})
+    if get_resp.status_code == 200:
+        sha = get_resp.json()["sha"]
+    else:
+        sha = None
 
-    # Read and encode file content
-    with open(path, "rb") as f:
-        content = base64.b64encode(f.read()).decode("utf-8")
-
-    # Prepare commit payload
-    payload = {
-        "message": "Update ingredients.csv from Streamlit",
+    content = base64.b64encode(df.to_csv(index=False).encode()).decode()
+    data = {
+        "message": f"Update ingredients at {datetime.utcnow().isoformat()}Z",
         "content": content,
-        "branch": branch,
+        "branch": branch
     }
     if sha:
-        payload["sha"] = sha
+        data["sha"] = sha
 
-    # Send PUT request
-    put_resp = requests.put(api_url, headers=headers, json=payload)
+    put_resp = requests.put(api_url, headers=headers, json=data)
     if put_resp.status_code not in [200, 201]:
-        st.error(f"❌ GitHub push failed: {put_resp.status_code} - {put_resp.text}")
-        raise RuntimeError("GitHub push failed")
+        raise RuntimeError(f"GitHub API error: {put_resp.status_code}, {put_resp.text}")
+
+def save_business_costs_to_github(df: pd.DataFrame):
+    os.makedirs("data", exist_ok=True)
+    df.to_csv("data/business_costs.csv", index=False)
+
+    token = st.secrets["github_token"]
+    repo = st.secrets["github_repo"]
+    branch = st.secrets.get("github_branch", "main")
+    path = "data/business_costs.csv"
+
+    api_url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    get_resp = requests.get(api_url, headers=headers, params={"ref": branch})
+    if get_resp.status_code == 200:
+        sha = get_resp.json()["sha"]
+    else:
+        sha = None
+
+    content = base64.b64encode(df.to_csv(index=False).encode()).decode()
+    data = {
+        "message": f"Update business costs at {datetime.utcnow().isoformat()}Z",
+        "content": content,
+        "branch": branch
+    }
+    if sha:
+        data["sha"] = sha
+
+    put_resp = requests.put(api_url, headers=headers, json=data)
+    if put_resp.status_code not in [200, 201]:
+        raise RuntimeError(f"GitHub API error: {put_resp.status_code}, {put_resp.text}")
