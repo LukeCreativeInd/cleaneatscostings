@@ -36,7 +36,7 @@ def render():
     with st.form("add_ingredient_form"):
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
-            name = st.text_input("Ingredient Name")
+            name = st.text_input("Ingredient Name", value="", key="ingredient_name")
         with cols[1]:
             unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS)
         with cols[2]:
@@ -53,6 +53,7 @@ def render():
                 "Cost": cost
             }
             st.session_state.new_entry_df = new_rows
+            st.session_state.ingredient_name = ""
             st.rerun()
 
     if not new_rows.empty:
