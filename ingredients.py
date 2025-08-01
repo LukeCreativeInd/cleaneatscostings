@@ -40,11 +40,17 @@ def render():
                 st.session_state["ingredient_name"] = ""
             name = st.text_input("Ingredient Name", value=st.session_state["ingredient_name"], key="ingredient_name")
         with cols[1]:
-            unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS)
+            if "ingredient_unit_type" not in st.session_state:
+                st.session_state["ingredient_unit_type"] = UNIT_TYPE_OPTIONS[0]
+            unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS, index=UNIT_TYPE_OPTIONS.index(st.session_state["ingredient_unit_type"]), key="ingredient_unit_type")
         with cols[2]:
-            purchase_size = st.number_input("Purchase Size", min_value=0.0, step=0.1)
+            if "ingredient_purchase_size" not in st.session_state:
+                st.session_state["ingredient_purchase_size"] = 0.0
+            purchase_size = st.number_input("Purchase Size", min_value=0.0, step=0.1, key="ingredient_purchase_size")
         with cols[3]:
-            cost = st.number_input("Cost", min_value=0.0, step=0.1)
+            if "ingredient_cost" not in st.session_state:
+                st.session_state["ingredient_cost"] = 0.0
+            cost = st.number_input("Cost", min_value=0.0, step=0.1, key="ingredient_cost")
 
         add = st.form_submit_button("➕ Add Ingredient")
         if add and name and purchase_size:
@@ -56,6 +62,9 @@ def render():
             }
             st.session_state.new_entry_df = new_rows
             st.session_state["ingredient_name"] = ""
+            st.session_state["ingredient_unit_type"] = UNIT_TYPE_OPTIONS[0]
+            st.session_state["ingredient_purchase_size"] = 0.0
+            st.session_state["ingredient_cost"] = 0.0
             st.rerun()
 
     if not new_rows.empty:
