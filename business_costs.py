@@ -10,7 +10,8 @@ from utils import save_business_costs_to_github
 COST_TYPE_OPTIONS = [
     "Packaging", "Labour", "Overhead", "Wastage", "Utilities", "Rent", "Tape/Labels", "Boxes", "Delivery", "Marketing", "Other"
 ]
-UNIT_TYPE_OPTIONS = ["KG", "L", "Unit"]
+UNIT_OPTIONS = ["per item", "per week", "per month", "per delivery", "per hour", "fixed"]
+
 DATA_PATH = "data/business_costs.csv"
 
 def load_business_costs():
@@ -39,7 +40,7 @@ def load_business_costs():
 
 def render():
     st.header("📦 Business Costs Manager")
-    st.info("Use this tab to manage recurring business costs such as packaging, wages, rent, and more.\n\n**'Unit'** should reflect the measurement type (e.g. per KG, per Litre, per Unit).\n**'Amount'** is the dollar value.")
+    st.info("Use this tab to manage recurring business costs such as packaging, wages, rent, and more.\n\n**'Unit'** should describe how often this cost occurs (e.g. per delivery, per week).\n**'Amount'** is the dollar value.")
 
     business_df = load_business_costs()
     st.session_state.business_costs_df = business_df
@@ -74,7 +75,7 @@ def render():
         with cols[1]:
             cost_type = st.selectbox("Cost Type", COST_TYPE_OPTIONS, key="business_cost_type")
         with cols[2]:
-            unit = st.selectbox("Unit", UNIT_TYPE_OPTIONS, key="business_cost_unit")
+            unit = st.selectbox("Unit", UNIT_OPTIONS, key="business_cost_unit")
         with cols[3]:
             amount = st.number_input("Amount", min_value=0.0, step=0.1, key="business_cost_amount")
 
