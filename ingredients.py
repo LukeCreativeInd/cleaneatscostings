@@ -28,7 +28,7 @@ def load_ingredients():
             content = base64.b64decode(resp.json()["content"])
             df = pd.read_csv(io.StringIO(content.decode("utf-8")))
 
-            # Save to local CSV for session persistence
+            # Save locally for use in session
             os.makedirs("data", exist_ok=True)
             df.to_csv(DATA_PATH, index=False)
 
@@ -39,7 +39,6 @@ def load_ingredients():
     except Exception as e:
         st.warning(f"⚠️ Exception loading ingredients: {e}")
 
-    st.write("🆕 Initialising blank ingredient list")
     return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
 
 def render():
@@ -49,7 +48,8 @@ def render():
     if "ingredients_df" not in st.session_state:
         st.session_state.ingredients_df = load_ingredients()
 
-    full_df = st.session_state.ingredients_df.copy()
+    full_df = st.session_state.get("ingredients_df", pd.DataFrame())
+    st.write("📦 Loaded ingredient data:", full_df)
 
     def live_cost_per_unit(row):
         try:
@@ -61,12 +61,16 @@ def render():
     saved_df["Cost per Unit"] = saved_df.apply(live_cost_per_unit, axis=1)
 
     st.subheader("🧾 Saved Ingredients")
-    edited_saved_df = st.data_editor(
-        saved_df,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="saved_ingredients"
-    )
+    if not saved_df.empty:
+        edited_saved_df = st.data_editor(
+            saved_df,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="saved_ingredients"
+        )
+    else:
+        st.warning("No saved ingredients yet.")
+        edited_saved_df = saved_df
 
     st.divider()
     st.subheader("➕ New Ingredient Entry")
