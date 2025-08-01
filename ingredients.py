@@ -46,4 +46,6 @@ def render():
             save_ingredients(combined)
             st.success("✅ Ingredients saved!")
             st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
-            st.rerun()
+            import streamlit.runtime.scriptrunner.script_run_context as script_context
+            from streamlit.runtime.scriptrunner import RerunException
+            raise RerunException(script_context.get_script_run_ctx())
