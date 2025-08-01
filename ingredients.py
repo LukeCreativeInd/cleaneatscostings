@@ -36,8 +36,6 @@ def render():
     with st.form("add_ingredient_form"):
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
-            if "ingredient_name" not in st.session_state:
-                del st.session_state["ingredient_name"] if "ingredient_name" in st.session_state else None
             name = st.text_input("Ingredient Name", key="ingredient_name")
         with cols[1]:
             if "ingredient_unit_type" not in st.session_state:
@@ -61,7 +59,8 @@ def render():
                 "Cost": cost
             }
             st.session_state.new_entry_df = new_rows
-            st.session_state["ingredient_name"] = ""
+            if "ingredient_name" in st.session_state:
+                del st.session_state["ingredient_name"]
             st.session_state["ingredient_unit_type"] = UNIT_TYPE_OPTIONS[0]
             st.session_state["ingredient_purchase_size"] = 0.0
             st.session_state["ingredient_cost"] = 0.0
