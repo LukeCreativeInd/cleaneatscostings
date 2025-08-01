@@ -74,7 +74,7 @@ def render():
             combined["Cost per Unit"] = combined.apply(live_cost_per_unit, axis=1)
             st.session_state.ingredients_df = combined
 
-            from app import save_ingredients
+            from utils import save_ingredients
             save_ingredients(combined)
 
             st.success("✅ Ingredients saved!")
