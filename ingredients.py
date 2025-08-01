@@ -37,7 +37,7 @@ def render():
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
             if "ingredient_name" not in st.session_state:
-                st.session_state["ingredient_name"] = ""
+                del st.session_state["ingredient_name"] if "ingredient_name" in st.session_state else None
             name = st.text_input("Ingredient Name", key="ingredient_name")
         with cols[1]:
             if "ingredient_unit_type" not in st.session_state:
