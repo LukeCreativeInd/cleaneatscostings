@@ -36,13 +36,13 @@ def render():
     with st.form("add_ingredient_form"):
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
-            name = st.text_input("Ingredient Name")
+            name = st.text_input("Ingredient Name", key="ingredient_name")
         with cols[1]:
-            unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS)
+            unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS, key="ingredient_unit_type")
         with cols[2]:
-            purchase_size = st.number_input("Purchase Size", min_value=0.0, step=0.1)
+            purchase_size = st.number_input("Purchase Size", min_value=0.0, step=0.1, key="ingredient_purchase_size")
         with cols[3]:
-            cost = st.number_input("Cost", min_value=0.0, step=0.1)
+            cost = st.number_input("Cost", min_value=0.0, step=0.1, key="ingredient_cost")
 
         add = st.form_submit_button("➕ Add Ingredient")
         if add and name and purchase_size:
