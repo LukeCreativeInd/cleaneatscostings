@@ -36,7 +36,7 @@ def save_ingredients(df): df.to_csv(INGREDIENTS_FILE, index=False)
 def save_business_costs(df): df.to_csv(BUSINESS_COSTS_FILE, index=False)
 
 # --- LOGIN CHECK ---
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
 logged_in = query_params.get("access", [""])[0] == "ok"
 
 if not logged_in:
