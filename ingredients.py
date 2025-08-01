@@ -2,20 +2,43 @@ import streamlit as st
 import pandas as pd
 import os
 import uuid
+import base64
+import requests
 from utils import save_ingredients_to_github
 
 UNIT_TYPE_OPTIONS = ["KG", "L", "Unit"]
 DATA_PATH = "data/ingredients.csv"
+
+
+def load_ingredients():
+    if os.path.exists(DATA_PATH):
+        return pd.read_csv(DATA_PATH)
+
+    # Load from GitHub fallback
+    try:
+        token = st.secrets["github_token"]
+        repo = st.secrets["github_repo"]
+        branch = st.secrets.get("github_branch", "main")
+        path = "data/ingredients.csv"
+
+        api_url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}"
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = requests.get(api_url, headers=headers)
+        if resp.status_code == 200:
+            content = base64.b64decode(resp.json()["content"])
+            return pd.read_csv(pd.compat.StringIO(content.decode("utf-8")))
+    except Exception as e:
+        st.warning(f"⚠️ Could not load ingredients from GitHub: {e}")
+
+    return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
+
 
 def render():
     st.header("📋 Ingredient Manager")
     st.info("Use this tab to manage ingredients used in meals.\n\n**'Purchase Size'** is how much you buy at once (e.g. 5KG).\n**'Unit Type'** specifies if it's in kilograms, litres, or units.\n**'Cost'** is the total cost for the full purchase size.\n\nThe system calculates cost per unit automatically.")
 
     if "ingredients_df" not in st.session_state:
-        if os.path.exists(DATA_PATH):
-            st.session_state.ingredients_df = pd.read_csv(DATA_PATH)
-        else:
-            st.session_state.ingredients_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
+        st.session_state.ingredients_df = load_ingredients()
 
     full_df = st.session_state.ingredients_df.copy()
 
