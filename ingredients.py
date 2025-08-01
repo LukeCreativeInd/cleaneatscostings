@@ -34,21 +34,20 @@ def render():
     new_rows = st.session_state.new_entry_df.copy()
 
     with st.form("add_ingredient_form"):
+        name_container = st.empty()
+        unit_container = st.empty()
+        size_container = st.empty()
+        cost_container = st.empty()
+
         cols = st.columns([3, 2, 2, 2])
         with cols[0]:
-            name = st.text_input("Ingredient Name", key="ingredient_name")
+            name = name_container.text_input("Ingredient Name")
         with cols[1]:
-            if "ingredient_unit_type" not in st.session_state:
-                st.session_state["ingredient_unit_type"] = UNIT_TYPE_OPTIONS[0]
-            unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS, index=UNIT_TYPE_OPTIONS.index(st.session_state["ingredient_unit_type"]), key="ingredient_unit_type")
+            unit_type = unit_container.selectbox("Unit Type", UNIT_TYPE_OPTIONS)
         with cols[2]:
-            if "ingredient_purchase_size" not in st.session_state:
-                st.session_state["ingredient_purchase_size"] = 0.0
-            purchase_size = st.number_input("Purchase Size", min_value=0.0, step=0.1, key="ingredient_purchase_size")
+            purchase_size = size_container.number_input("Purchase Size", min_value=0.0, step=0.1)
         with cols[3]:
-            if "ingredient_cost" not in st.session_state:
-                st.session_state["ingredient_cost"] = 0.0
-            cost = st.number_input("Cost", min_value=0.0, step=0.1, key="ingredient_cost")
+            cost = cost_container.number_input("Cost", min_value=0.0, step=0.1)
 
         add = st.form_submit_button("➕ Add Ingredient")
         if add and name and purchase_size:
@@ -59,9 +58,10 @@ def render():
                 "Cost": cost
             }
             st.session_state.new_entry_df = new_rows
-            for key in ["ingredient_name", "ingredient_unit_type", "ingredient_purchase_size", "ingredient_cost"]:
-                if key in st.session_state:
-                    del st.session_state[key]
+            name_container.empty()
+            unit_container.empty()
+            size_container.empty()
+            cost_container.empty()
             st.rerun()
 
     if not new_rows.empty:
