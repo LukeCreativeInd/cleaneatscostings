@@ -2,3 +2,5 @@ Meal,Ingredient,Quantity,Cost Per Unit,Total Cost
 Test Meal,Test3,2.0,0.5,1.0
 Test Meal,Test6,5.0,1.0,5.0
 Test Meal,Test7,10.0,1.0,10.0
+Test Meal 2,Test3,1.0,0.5,0.5
+Test Meal 2,Test5,5.0,1.0,5.0
