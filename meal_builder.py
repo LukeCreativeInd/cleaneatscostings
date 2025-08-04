@@ -1,28 +1,49 @@
 import streamlit as st
 import pandas as pd
 import os
-import uuid
 
 MEAL_DATA_PATH = "data/meals.csv"
 INGREDIENTS_PATH = "data/ingredients.csv"
+
 
 def load_meals():
     if os.path.exists(MEAL_DATA_PATH):
         return pd.read_csv(MEAL_DATA_PATH)
     return pd.DataFrame(columns=["Meal", "Ingredient", "Quantity", "Cost per Unit", "Total Cost"])
 
+
 def load_ingredients():
     if os.path.exists(INGREDIENTS_PATH):
         df = pd.read_csv(INGREDIENTS_PATH)
-        df.columns = df.columns.str.strip().str.title()
-        if "Cost Per Unit" not in df.columns and "Cost" in df.columns and "Purchase Size" in df.columns:
-            df["Cost per Unit"] = df.apply(
-                lambda row: round(float(row["Cost"]) / float(row["Purchase Size"]), 4)
-                if row["Purchase Size"] != 0 else 0,
-                axis=1
-            )
+        # Normalize column names (strip + title case)
+        df.columns = df.columns.str.strip()
+        rename_map = {col: col.strip().title() for col in df.columns}
+        df = df.rename(columns=rename_map)
+
+        # Ensure Ingredient column exists and is cleaned
+        if "Ingredient" not in df.columns:
+            df["Ingredient"] = ""
+        df["Ingredient"] = df["Ingredient"].astype(str).str.strip()
+
+        # Ensure cost per unit exists / derive if possible
+        if "Cost Per Unit" not in df.columns:
+            if "Cost" in df.columns and "Purchase Size" in df.columns:
+                def compute_cpu(row):
+                    try:
+                        purchase_size = float(row["Purchase Size"])
+                        cost = float(row["Cost"])
+                        return round(cost / purchase_size, 4) if purchase_size != 0 else 0
+                    except Exception:
+                        return 0
+
+                df["Cost Per Unit"] = df.apply(compute_cpu, axis=1)
+            else:
+                df["Cost Per Unit"] = 0
         return df
-    return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost per Unit"])
+    return pd.DataFrame(
+        columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost Per Unit"]
+    )
+
 
 def render():
     st.header("🍽️ Meal Builder")
@@ -38,59 +59,119 @@ def render():
     meals_df = load_meals()
     ingredients_df = load_ingredients()
 
-    if "meal_name" not in st.session_state:
-        st.session_state.meal_name = ""
+    # Normalize ingredient names for selectbox and keep in memory for callbacks
+    ingredients_df["Ingredient"] = ingredients_df["Ingredient"].astype(str).str.strip().str.title()
+    ingredient_options = sorted(ingredients_df["Ingredient"].dropna().unique())
 
+    # Session state defaults
+    st.session_state.setdefault("meal_name", "")
+    st.session_state.setdefault(
+        "meal_ingredients",
+        pd.DataFrame(
+            columns=["Ingredient", "Quantity", "Cost per Unit", "Total Cost"]
+        ),
+    )
+    st.session_state.setdefault("new_meal_quantity", 0.0)
+    if "new_meal_ingredient" not in st.session_state:
+        # Pre-fill with first ingredient if available, else empty string
+        st.session_state.new_meal_ingredient = ingredient_options[0] if ingredient_options else ""
+
+    # Callbacks
+
+    def add_ingredient_callback():
+        meal_name = st.session_state.meal_name.strip()
+        ingredient = st.session_state.new_meal_ingredient
+        quantity = st.session_state.new_meal_quantity
+
+        if not meal_name:
+            st.warning("Enter a meal name before adding ingredients.")
+            return
+        if not ingredient or quantity <= 0:
+            st.warning("Ingredient and quantity must be provided and quantity must be greater than zero.")
+            return
+
+        # Lookup cost per unit (case-insensitive match)
+        match = ingredients_df[
+            ingredients_df["Ingredient"].str.lower() == str(ingredient).strip().lower()
+        ]
+        if match.empty or "Cost Per Unit" not in match.columns:
+            st.error(f"Cost lookup failed for ingredient '{ingredient}'.")
+            return
+
+        try:
+            cpu = float(match.iloc[0]["Cost Per Unit"])
+        except Exception:
+            st.error(f"Invalid cost data for '{ingredient}'.")
+            return
+
+        total_cost = round(cpu * quantity, 4)
+        new_row = {
+            "Ingredient": ingredient,
+            "Quantity": quantity,
+            "Cost per Unit": cpu,
+            "Total Cost": total_cost,
+        }
+
+        # Append
+        updated = pd.concat(
+            [st.session_state.meal_ingredients, pd.DataFrame([new_row])],
+            ignore_index=True,
+        )
+        st.session_state.meal_ingredients = updated
+
+        # Reset input quantity (but keep ingredient selection)
+        st.session_state.new_meal_quantity = 0.0
+
+    def save_meal_callback():
+        meal_name = st.session_state.meal_name.strip()
+        ingredients = st.session_state.meal_ingredients
+
+        if not meal_name or ingredients.empty:
+            st.warning("Meal name and at least one ingredient are required.")
+            return
+
+        try:
+            current = meals_df.copy()
+            new_meal = ingredients.copy()
+            new_meal.insert(0, "Meal", meal_name)
+            combined = pd.concat([current, new_meal], ignore_index=True)
+
+            os.makedirs("data", exist_ok=True)
+            combined.to_csv(MEAL_DATA_PATH, index=False)
+
+            st.success("✅ Meal saved!")
+            # Reset builder state
+            st.session_state.meal_name = ""
+            st.session_state.meal_ingredients = pd.DataFrame(
+                columns=["Ingredient", "Quantity", "Cost per Unit", "Total Cost"]
+            )
+            st.session_state.new_meal_quantity = 0.0
+        except Exception as e:
+            st.error(f"Failed to save meal: {e}")
+
+    # UI layout
     st.text_input("Meal Name", key="meal_name")
-
-    if "meal_ingredients" not in st.session_state:
-        st.session_state.meal_ingredients = pd.DataFrame(columns=["Ingredient", "Quantity", "Cost per Unit", "Total Cost"])
 
     ingredient_col, quantity_col, add_col = st.columns([3, 2, 1])
     with ingredient_col:
-        ingredient = st.selectbox("Ingredient", ingredients_df["Ingredient"].dropna().unique(), key="new_meal_ingredient")
+        st.selectbox(
+            "Ingredient",
+            options=ingredient_options,
+            key="new_meal_ingredient",
+            help="Select an ingredient to add to the meal.",
+        )
     with quantity_col:
-        quantity = st.number_input("Qty", min_value=0.0, step=0.1, key="new_meal_quantity")
+        st.number_input(
+            "Qty",
+            min_value=0.0,
+            step=0.1,
+            key="new_meal_quantity",
+        )
     with add_col:
-        if st.button("➕ Add Ingredient"):
-            if st.session_state.meal_name and ingredient and quantity:
-                match = ingredients_df[ingredients_df["Ingredient"] == ingredient]
-                if not match.empty and "Cost per Unit" in match.columns:
-                    cpu = match.iloc[0]["Cost per Unit"]
-                    total_cost = round(cpu * quantity, 4)
-                    new_row = {
-                        "Ingredient": ingredient,
-                        "Quantity": quantity,
-                        "Cost per Unit": cpu,
-                        "Total Cost": total_cost
-                    }
-                    st.session_state.meal_ingredients = pd.concat(
-                        [st.session_state.meal_ingredients, pd.DataFrame([new_row])],
-                        ignore_index=True
-                    )
-                    del st.session_state["new_meal_ingredient"]
-                    del st.session_state["new_meal_quantity"]
-                    st.rerun()
-                else:
-                    st.error("Selected ingredient is missing cost data.")
-            else:
-                st.warning("Enter a meal name and ingredient details before adding.")
+        st.button("➕ Add Ingredient", on_click=add_ingredient_callback)
 
     if not st.session_state.meal_ingredients.empty:
         st.subheader(f"🧾 Ingredients for '{st.session_state.meal_name}'")
         st.dataframe(st.session_state.meal_ingredients, use_container_width=True)
 
-    if st.button("💾 Save Meal"):
-        if st.session_state.meal_name and not st.session_state.meal_ingredients.empty:
-            current = meals_df.copy()
-            new_meal = st.session_state.meal_ingredients.copy()
-            new_meal.insert(0, "Meal", st.session_state.meal_name)
-            meals_df = pd.concat([current, new_meal], ignore_index=True)
-            os.makedirs("data", exist_ok=True)
-            meals_df.to_csv(MEAL_DATA_PATH, index=False)
-            st.success("✅ Meal saved!")
-            st.session_state.meal_name = ""
-            st.session_state.meal_ingredients = pd.DataFrame(columns=["Ingredient", "Quantity", "Cost per Unit", "Total Cost"])
-            st.rerun()
-        else:
-            st.warning("Meal name and at least one ingredient are required.")
+    st.button("💾 Save Meal", on_click=save_meal_callback)
