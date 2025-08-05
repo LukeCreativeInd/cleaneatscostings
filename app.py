@@ -35,23 +35,28 @@ if not st.session_state.logged_in:
     st.stop()
 
 # --- PAGE LAYOUT ---
-# Move title and description above tabs to ensure consistent placement
 st.title("📊 Clean Eats Meal Costings")
 st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
 
-# --- PAGE NAVIGATION via built-in tabs ---
-tab_dashboard, tab_ingredients, tab_meals, tab_business = st.tabs([
+# --- PAGE NAVIGATION with dynamic tab order ---
+ALL_TABS = [
     "💰 Costing Dashboard",
     "📋 Ingredients",
     "🍽️ Meals",
     "⚙️ Business Costs",
-])
+]
+# Default to last visited tab or dashboard
+active_tab = st.session_state.get("last_active_tab", "💰 Costing Dashboard")
+# Order tabs so the active_tab is first
+tab_order = [active_tab] + [t for t in ALL_TABS if t != active_tab]
+tabs = st.tabs(tab_order)
 
 # --- SESSION DATA LOAD ---
 DATA_FILE = "data/stored_total_summary.csv"
 INGREDIENTS_FILE = "data/ingredients.csv"
 BUSINESS_COSTS_FILE = "data/business_costs.csv"
 
+# Initialize dataframes in session state
 if "total_df" not in st.session_state:
     st.session_state.total_df = pd.read_csv(DATA_FILE) if os.path.exists(DATA_FILE) else pd.DataFrame(
         columns=["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]
@@ -66,11 +71,16 @@ if "business_costs_df" not in st.session_state:
     )
 
 # --- RENDER PAGES ---
-with tab_dashboard:
-    dashboard.render()
-with tab_ingredients:
-    ingredients.render()
-with tab_meals:
-    meal_builder.render()
-with tab_business:
-    business_costs.render()
+for label, tab in zip(tab_order, tabs):
+    with tab:
+        # Persist the current tab for next rerun
+        st.session_state["last_active_tab"] = label
+        # Dispatch to modules
+        if label == "💰 Costing Dashboard":
+            dashboard.render()
+        elif label == "📋 Ingredients":
+            ingredients.render()
+        elif label == "🍽️ Meals":
+            meal_builder.render()
+        else:
+            business_costs.render()
