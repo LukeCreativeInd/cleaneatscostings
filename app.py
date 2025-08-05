@@ -49,21 +49,35 @@ if "selected_page" not in st.session_state:
 st.markdown(
     '''
     <style>
+    /* Make radiogroup horizontal */
     div[role="radiogroup"] {
         display: flex;
-        gap: 1rem;
+        padding: 0;
+        margin: 0;
     }
+    /* Each option container flexes equally and centers text */
+    div[role="radiogroup"] > div {
+        flex: 1;
+        text-align: center;
+        padding: 0;
+        margin: 0;
+    }
+    /* Hide the original radio inputs */
     div[role="radiogroup"] input[type="radio"] {
-        display: none;
+        display: none !important;
     }
-    div[role="radiogroup"] input[type="radio"] + label {
-        padding: 0.5rem 1rem;
+    /* Style labels as tabs */
+    div[role="radiogroup"] label {
+        display: block;
+        padding: 0.75rem 1rem;
         cursor: pointer;
         border-bottom: 2px solid transparent;
+        margin: 0;
     }
+    /* Highlight the selected tab */
     div[role="radiogroup"] input[type="radio"]:checked + label {
         font-weight: bold;
-        border-color: #000;
+        border-color: #FFF; /* White bottom border to stand out on dark background */
     }
     </style>
     ''',
