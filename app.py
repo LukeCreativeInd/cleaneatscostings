@@ -70,24 +70,20 @@ if "business_costs_df" not in st.session_state:
     st.session_state.business_costs_df = initialize_business_costs()
 
 # --- PAGE LAYOUT ---
-st.title("📊 Clean Eats Meal Costings")
-st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
-
-tab1, tab2, tab3, tab4 = st.tabs([
-    "💰 Costing Dashboard",
-    "📋 Ingredients",
-    "🍽️ Meals",
-    "⚙️ Business Costs"
-])
-
-with tab1:
-    dashboard.render()
-
-with tab2:
-    ingredients.render()
-
-with tab3:
-    meal_builder.render()
-
-with tab4:
-    business_costs.render()
+# Sidebar navigation to persist across reruns
+st.sidebar.title("📂 Navigation")
+pages = {
+    "💰 Costing Dashboard": dashboard.render,
+    "📋 Ingredients": ingredients.render,
+    "🍽️ Meals": meal_builder.render,
+    "⚙️ Business Costs": business_costs.render,
+}
+# Determine default index
+if "page_index" not in st.session_state:
+    st.session_state.page_index = 0
+# Radio for page selection
+page_titles = list(pages.keys())
+selection = st.sidebar.radio("Go to", page_titles, index=st.session_state.page_index)
+st.session_state.page_index = page_titles.index(selection)
+# Render selected page
+pages[selection]()
