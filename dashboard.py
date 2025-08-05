@@ -29,15 +29,19 @@ def save_summary_to_github(df: pd.DataFrame):
     except KeyError:
         st.warning("Missing GitHub secrets; saved locally only.")
         return
-    url = f"https://api.github.com/repos/{repo}/contents/{SUMMARY_PATH}"
+    api_url = f"https://api.github.com/repos/{repo}/contents/{SUMMARY_PATH}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
-    resp = requests.get(url, headers=headers, params={"ref": branch})
+    resp = requests.get(api_url, headers=headers, params={"ref": branch})
     sha = resp.json().get("sha") if resp.status_code == 200 else None
     content = base64.b64encode(df.to_csv(index=False).encode()).decode()
-    payload = {"message": f"Update costing summary {datetime.utcnow().isoformat()}Z", "content": content, "branch": branch}
+    payload = {
+        "message": f"Update costing summary {datetime.utcnow().isoformat()}Z",
+        "content": content,
+        "branch": branch,
+    }
     if sha:
         payload["sha"] = sha
-    put = requests.put(url, headers=headers, json=payload)
+    put = requests.put(api_url, headers=headers, json=payload)
     if put.status_code not in (200, 201):
         st.error(f"GitHub commit failed: {put.status_code} {put.text}")
 
@@ -67,18 +71,18 @@ def render():
     # Load overrides
     stored = load_stored_summary()
 
-    # Start summary from base
+    # Initialize summary
     summary = base.copy()
     summary["Other Costs"] = 0.0
     summary["Sell Price"] = summary["Ingredients"].copy()
 
-    # Apply overrides if present
+    # Apply stored overrides
     if not stored.empty:
         merged = summary.merge(stored, on="Meal", how="left", suffixes=("", "_ovr"))
         summary["Other Costs"] = merged["Other Costs_ovr"].fillna(summary["Other Costs"])
         summary["Sell Price"] = merged["Sell Price_ovr"].fillna(summary["Sell Price"])
 
-    # Compute metrics
+    # Compute derived metrics
     summary["Total Cost"] = summary["Ingredients"] + summary["Other Costs"]
     summary["Profit Margin"] = summary["Sell Price"] - summary["Total Cost"]
     summary["Margin %"] = summary.apply(
@@ -86,7 +90,7 @@ def render():
         axis=1,
     )
 
-    # Editable table
+    # Editable per-meal summary
     st.subheader("📦 Per-Meal Cost Summary")
     editor = st.data_editor(
         summary[["Meal", "Ingredients", "Other Costs", "Sell Price"]],
@@ -95,13 +99,13 @@ def render():
         num_rows="dynamic",
         column_config={
             "Meal": st.column_config.TextColumn(disabled=True),
-            "Ingredients": st.column_config.NumberColumn(prefix="$", format=",.2f", disabled=True),
-            "Other Costs": st.column_config.NumberColumn(prefix="$", format=",.2f"),
-            "Sell Price": st.column_config.NumberColumn(prefix="$", format=",.2f"),
+            "Ingredients": st.column_config.NumberColumn(format="$,.2f", disabled=True),
+            "Other Costs": st.column_config.NumberColumn(format="$,.2f"),
+            "Sell Price": st.column_config.NumberColumn(format="$,.2f"),
         },
     )
 
-    # Finalize
+    # Final summary
     final = editor.copy()
     final["Total Cost"] = final["Ingredients"] + final["Other Costs"]
     final["Profit Margin"] = final["Sell Price"] - final["Total Cost"]
@@ -138,7 +142,7 @@ def render():
         fmt = f"${value:,.2f}" if "%" not in label else f"{value:.1f}%"
         cols[idx].metric(label, fmt)
 
-    # Save
+    # Save button
     if st.button("💾 Save Costing Summary", key="save_summary_final"):
         save_summary_to_github(final[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]])
         st.success("✅ Costing summary saved and committed.")
