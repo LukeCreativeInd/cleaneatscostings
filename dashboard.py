@@ -18,7 +18,7 @@ def load_stored_summary():
 
 
 def save_summary_to_github(df: pd.DataFrame):
-    """Commit data/stored_total_summary.csv to GitHub using your existing pattern."""
+    """Commit data/stored_total_summary.csv to GitHub using the existing pattern."""
     os.makedirs(os.path.dirname(SUMMARY_PATH), exist_ok=True)
     df.to_csv(SUMMARY_PATH, index=False)
     try:
@@ -26,60 +26,49 @@ def save_summary_to_github(df: pd.DataFrame):
         repo = st.secrets["github_repo"]
         branch = st.secrets.get("github_branch", "main")
     except KeyError:
-        st.warning("GitHub secrets missing; summary saved locally but not pushed.")
+        st.warning("GitHub secrets missing; summary saved locally only.")
         return
 
-    repo_path = SUMMARY_PATH  # commit as data/stored_total_summary.csv
-    api_url = f"https://api.github.com/repos/{repo}/contents/{repo_path}"
+    api_url = f"https://api.github.com/repos/{repo}/contents/{SUMMARY_PATH}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
-
-    # Try to get existing file SHA
     resp = requests.get(api_url, headers=headers, params={"ref": branch})
     sha = resp.json().get("sha") if resp.status_code == 200 else None
 
-    content = base64.b64encode(df.to_csv(index=False).encode()).decode()
+    content_b64 = base64.b64encode(df.to_csv(index=False).encode()).decode()
     payload = {
         "message": f"Update costing summary at {datetime.utcnow().isoformat()}Z",
-        "content": content,
+        "content": content_b64,
         "branch": branch,
     }
     if sha:
         payload["sha"] = sha
 
-    put = requests.put(api_url, headers=headers, json=payload)
-    if put.status_code in (200, 201):
+    put_resp = requests.put(api_url, headers=headers, json=payload)
+    if put_resp.status_code in (200, 201):
         st.success("✅ Costing summary committed to GitHub")
     else:
-        st.error(f"GitHub commit failed ({put.status_code}): {put.text}")
+        st.error(f"GitHub commit failed: {put_resp.status_code} {put_resp.text}")
 
 
 def render():
     st.header("💰 Costing Dashboard")
-
     stored_summary = load_stored_summary()
 
     if os.path.exists(MEALS_PATH):
         meals_df = pd.read_csv(MEALS_PATH)
         if not meals_df.empty:
-            # Aggregate base ingredient costs
-            agg = (
-                meals_df.groupby("Meal")["Total Cost"].sum()
-                .reset_index()
-                .rename(columns={"Total Cost": "Ingredients"})
-            )
-            merged = agg.merge(
-                stored_summary[["Meal", "Other Costs", "Sell Price"]],
-                on="Meal", how="left"
-            )
+            # Aggregate ingredient costs per meal
+            agg = meals_df.groupby("Meal")["Total Cost"].sum().reset_index().rename(columns={"Total Cost": "Ingredients"})
+            merged = agg.merge(stored_summary[["Meal", "Other Costs", "Sell Price"]], on="Meal", how="left")
             merged["Other Costs"] = merged["Other Costs"].fillna(0.0)
-            merged["Sell Price"] = merged["Sell Price"].fillna(
-                merged["Ingredients"] + merged["Other Costs"]
-            )
+            merged["Sell Price"] = merged["Sell Price"].fillna(merged["Ingredients"] + merged["Other Costs"])
+
+            # Compute derived metrics
             merged["Total Cost"] = merged["Ingredients"] + merged["Other Costs"]
             merged["Profit Margin"] = merged["Sell Price"] - merged["Total Cost"]
             merged["Margin %"] = merged.apply(
                 lambda r: (r["Profit Margin"]/r["Sell Price"]*100) if r["Sell Price"] else 0.0,
-                axis=1
+                axis=1,
             )
 
             st.subheader("📦 Per-Meal Cost Summary")
@@ -98,15 +87,16 @@ def render():
                     "Sell Price": st.column_config.NumberColumn("Sell Price", format="${:.2f}"),
                 },
             )
-            # compute derived
+
+            # Recompute after edit
             edited["Total Cost"] = edited["Ingredients"] + edited["Other Costs"]
             edited["Profit Margin"] = edited["Sell Price"] - edited["Total Cost"]
             edited["Margin %"] = edited.apply(
                 lambda r: (r["Profit Margin"]/r["Sell Price"]*100) if r["Sell Price"] else 0.0,
-                axis=1
+                axis=1,
             )
-
             display_df = edited.copy()
+
             st.subheader("Finalized Summary")
             st.dataframe(
                 display_df.style.format({
@@ -120,7 +110,7 @@ def render():
                 use_container_width=True,
             )
 
-            # metrics
+            # Aggregate metrics
             total_ing = display_df["Ingredients"].sum()
             total_other = display_df["Other Costs"].sum()
             total_cost = display_df["Total Cost"].sum()
@@ -137,14 +127,14 @@ def render():
             cols[5].metric("Overall Margin %", f"{overall_pct:.1f}%")
 
             if st.button("💾 Save Costing Summary", key="save_summary"):
-                final = display_df[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]].copy()
+                final = display_df[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
                 st.session_state.total_df = final
                 from app import save_data
                 save_data(final)
                 st.success("✅ Summary saved locally")
                 save_summary_to_github(final)
         else:
-            st.warning("No meals in data. Build some meals first.")
+            st.warning("No meals found. Build meals first.")
     else:
         st.warning("No meal data file found.")
         uploaded = st.file_uploader("Import costing sheet", type=["xlsx"], key="import_dash")
@@ -158,11 +148,11 @@ def render():
                     "TOTAL": "Total Cost",
                     "SELL COST": "Sell Price",
                 })
-                clean = raw[["Meal","Ingredients","Other Costs","Total Cost","Sell Price"]]
+                clean = raw[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
                 st.session_state.total_df = clean
                 from app import save_data
                 save_data(clean)
-                st.success("✅ Imported and saved")
+                st.success("✅ Imported and saved locally")
                 save_summary_to_github(clean)
             except Exception as e:
                 st.error(f"Import failed: {e}")
