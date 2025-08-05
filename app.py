@@ -13,7 +13,11 @@ import business_costs
 st.set_page_config(page_title="Clean Eats Costings", layout="wide")
 
 # --- SECRETS ---
-password = st.secrets["access_password"]
+# Use .get to avoid KeyError if unset
+password = st.secrets.get("access_password")
+if password is None:
+    st.error("⚠️ Access password not configured in secrets['access_password'].")
+    st.stop()
 SESSION_TIMEOUT = 3600  # 1 hour
 
 # --- FILE PATHS ---
@@ -23,21 +27,32 @@ BUSINESS_COSTS_FILE = "business_costs.csv"
 
 # --- SESSION SETUP ---
 def initialize_data():
-    return pd.read_csv(DATA_FILE) if os.path.exists(DATA_FILE) else pd.DataFrame(columns=["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"])
+    return pd.read_csv(DATA_FILE) if os.path.exists(DATA_FILE) else pd.DataFrame(
+        columns=["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]
+    )
 
 def initialize_ingredients():
-    return pd.read_csv(INGREDIENTS_FILE) if os.path.exists(INGREDIENTS_FILE) else pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost per Unit"])
+    return pd.read_csv(INGREDIENTS_FILE) if os.path.exists(INGREDIENTS_FILE) else pd.DataFrame(
+        columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost per Unit"]
+    )
 
 def initialize_business_costs():
-    return pd.read_csv(BUSINESS_COSTS_FILE) if os.path.exists(BUSINESS_COSTS_FILE) else pd.DataFrame(columns=["Name", "Type", "Amount", "Unit"])
+    return pd.read_csv(BUSINESS_COSTS_FILE) if os.path.exists(BUSINESS_COSTS_FILE) else pd.DataFrame(
+        columns=["Name", "Type", "Amount", "Unit"]
+    )
 
-def save_data(df): df.to_csv(DATA_FILE, index=False)
-def save_ingredients(df): df.to_csv(INGREDIENTS_FILE, index=False)
-def save_business_costs(df): df.to_csv(BUSINESS_COSTS_FILE, index=False)
+def save_data(df):
+    df.to_csv(DATA_FILE, index=False)
+
+def save_ingredients(df):
+    df.to_csv(INGREDIENTS_FILE, index=False)
+
+def save_business_costs(df):
+    df.to_csv(BUSINESS_COSTS_FILE, index=False)
 
 # --- LOGIN CHECK ---
-query_params = st.query_params
-logged_in = query_params.get("access", "") == "ok"
+query_params = st.experimental_get_query_params()
+logged_in = query_params.get("access", [None])[0] == "ok"
 
 if not logged_in:
     with st.form("login_form"):
@@ -46,8 +61,8 @@ if not logged_in:
         submitted = st.form_submit_button("Login")
         if submitted:
             if input_pw == password:
-                st.query_params = {"access": "ok"}
-                st.rerun()
+                st.experimental_set_query_params(access="ok")
+                st.experimental_rerun()
             else:
                 st.error("Incorrect password")
     st.stop()
