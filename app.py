@@ -34,46 +34,18 @@ if not st.session_state.logged_in:
                 st.error("Incorrect password")
     st.stop()
 
-# --- HEADER ---
+# --- PAGE LAYOUT ---
+# Move title and description above tabs to ensure consistent placement
 st.title("📊 Clean Eats Meal Costings")
 st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
 
-# --- PAGE NAVIGATION via disguised radio tabs ---
-pages = [
+# --- PAGE NAVIGATION via built-in tabs ---
+tab_dashboard, tab_ingredients, tab_meals, tab_business = st.tabs([
     "💰 Costing Dashboard",
     "📋 Ingredients",
     "🍽️ Meals",
     "⚙️ Business Costs",
-]
-if "selected_page" not in st.session_state:
-    st.session_state.selected_page = pages[0]
-
-# Hide radio circles and style labels as tabs
-st.markdown(
-    """
-    <style>
-    div[role=\"radiogroup\"] {
-      display: flex;
-      gap: 1rem;
-    }
-    div[role=\"radiogroup\"] input[type=\"radio\"] {
-      display: none;
-    }
-    div[role=\"radiogroup\"] label {
-      padding: 0.75rem 1rem;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-    }
-    div[role=\"radiogroup\"] input[type=\"radio\"]:checked + label {
-      font-weight: bold;
-      border-bottom: 2px solid #000;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-current = st.radio("", pages, index=pages.index(st.session_state.selected_page), key="selected_page", label_visibility="collapsed")
+])
 
 # --- SESSION DATA LOAD ---
 DATA_FILE = "data/stored_total_summary.csv"
@@ -93,12 +65,12 @@ if "business_costs_df" not in st.session_state:
         columns=["Name", "Type", "Amount", "Unit"]
     )
 
-# --- DISPATCH PAGES ---
-if current == pages[0]:
+# --- RENDER PAGES ---
+with tab_dashboard:
     dashboard.render()
-elif current == pages[1]:
+with tab_ingredients:
     ingredients.render()
-elif current == pages[2]:
+with tab_meals:
     meal_builder.render()
-else:
+with tab_business:
     business_costs.render()
