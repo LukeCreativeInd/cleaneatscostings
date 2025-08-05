@@ -265,9 +265,19 @@ def render():
             # Save Changes
             if st.button("💾 Save Changes", key=f"sv_{mn}"):
                 final_name = new_name.strip() or mn
+                # Use assignment instead of insert to avoid duplicate column
                 df_u = st.session_state[edit_key]
-                df_u.insert(0,'Meal', final_name)
-                others = meals_df[meals_df['Meal']!=mn]
+                df_u['Meal'] = final_name
+                # Reorder to ensure 'Meal' is first column
+                cols = ['Meal'] + [c for c in df_u.columns if c != 'Meal']
+                df_u = df_u[cols]
+                others = meals_df[meals_df['Meal'] != mn]
                 final_df = pd.concat([others, df_u], ignore_index=True)
                 os.makedirs("data", exist_ok=True)
                 final_df.to_csv(MEAL_DATA_PATH, index=False)
+                commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
+                st.success(f"✅ Changes saved for {final_name}!")
+                # Cleanup session state
+                del st.session_state[edit_key]
+                del st.session_state['editing_meal']
+                st.experimental_rerun()
