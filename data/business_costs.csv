@@ -1,3 +1,4 @@
 Name,Type,Unit,Amount
 testcost,Packaging,per item,1.0
 Test Cost 2,Boxes,per item,2.0
+Test Cost 3,Rent,per month,3200.0
