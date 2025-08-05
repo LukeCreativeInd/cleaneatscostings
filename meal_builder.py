@@ -134,7 +134,7 @@ def render():
         st.success(f"Added {qty}{st.session_state.new_unit} of {row['Ingredient']}")
         # reset quantity
         st.session_state.new_qty = 0.0
-        st.experimental_rerun()
+        
 
     def save_callback():
         name = st.session_state.meal_name.strip()
@@ -151,7 +151,7 @@ def render():
         st.session_state.meal_name = ""
         st.session_state.meal_ingredients = pd.DataFrame(columns=df_ing.columns)
         st.session_state.new_qty = 0.0
-        st.experimental_rerun()
+        
 
     # UI: New Meal
     st.subheader("Create / Add Meal")
@@ -210,7 +210,7 @@ def render():
                 # cleanup
                 del st.session_state[edit_key]
                 del st.session_state['editing_meal']
-                st.experimental_rerun()
+                
 
             st.markdown("### Ingredients")
             for idx, r in st.session_state[edit_key].iterrows():
@@ -232,7 +232,7 @@ def render():
                     df_tmp = st.session_state[edit_key]
                     df_tmp = df_tmp.drop(idx).reset_index(drop=True)
                     st.session_state[edit_key] = df_tmp
-                    st.experimental_rerun()
+                    
 
                         # Add Ingredient in edit
             st.markdown("#### Add Ingredient")
@@ -269,7 +269,7 @@ def render():
                 # Clear fields
                 st.session_state[aq_key] = 0.0
                 st.session_state[au_key] = uo_edit[0]
-                st.experimental_rerun()
+                
 
             a4.button("➕", key=f"addit_{mn}", on_click=addit_callback, args=(mn, edit_key, ai_key, aq_key, au_key))
 
@@ -291,4 +291,4 @@ def render():
                 # Cleanup session state
                 del st.session_state[edit_key]
                 del st.session_state['editing_meal']
-                st.experimental_rerun()
+                
