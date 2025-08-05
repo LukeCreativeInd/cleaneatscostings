@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 
-# Modular pages\import dashboard
+# Modular pages
+import dashboard
 import ingredients
 import meal_builder
 import business_costs
