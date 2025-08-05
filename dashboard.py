@@ -67,7 +67,8 @@ def render():
     # Load stored overrides
     stored = load_stored_summary()
 
-    # Merge and fill defaults    summary = pd.merge(cost_df, stored, on="Meal", how="left")
+        # Merge and fill defaults
+    summary = pd.merge(cost_df, stored, on="Meal", how="left")
     # Ensure 'Other Costs' exists and fill nulls
     if "Other Costs" not in summary.columns:
         summary["Other Costs"] = 0.0
