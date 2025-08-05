@@ -49,40 +49,39 @@ if "selected_page" not in st.session_state:
 st.markdown(
     '''
     <style>
-    /* Make radiogroup horizontal */
+    /* Container flex row */
     div[role="radiogroup"] {
         display: flex;
         padding: 0;
         margin: 0;
     }
-    /* Each option container flexes equally and centers text */
-    div[role="radiogroup"] > div {
+    /* Each label as a flex item */
+    div[role="radiogroup"] label {
         flex: 1;
-        text-align: center;
         padding: 0;
         margin: 0;
+        cursor: pointer;
     }
-    /* Hide the original radio inputs */
-    div[role="radiogroup"] input[type="radio"] {
+    /* Hide the circle inputs */
+    div[role="radiogroup"] label input[type="radio"] {
         display: none !important;
     }
-    /* Style labels as tabs */
-    div[role="radiogroup"] label {
-        display: block;
+    /* Style the inner text container */
+    div[role="radiogroup"] label > div {
         padding: 0.75rem 1rem;
-        cursor: pointer;
+        text-align: center;
         border-bottom: 2px solid transparent;
-        margin: 0;
     }
-    /* Highlight the selected tab */
-    div[role="radiogroup"] input[type="radio"]:checked + label {
+    /* Highlight selected tab */
+    div[role="radiogroup"] label input[type="radio"]:checked + div {
         font-weight: bold;
-        border-color: #FFF; /* White bottom border to stand out on dark background */
+        border-bottom-color: #FFF;
     }
     </style>
     ''',
     unsafe_allow_html=True,
 )
+
 
 # Render navigation
 current = st.radio("", pages,
