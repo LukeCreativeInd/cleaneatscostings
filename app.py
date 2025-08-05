@@ -34,6 +34,11 @@ if not st.session_state.logged_in:
                 st.error("Incorrect password")
     st.stop()
 
+# --- PAGE LAYOUT ---
+# Move title and description above tabs to ensure consistent placement
+st.title("📊 Clean Eats Meal Costings")
+st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
+
 # --- PAGE NAVIGATION via built-in tabs ---
 tab_dashboard, tab_ingredients, tab_meals, tab_business = st.tabs([
     "💰 Costing Dashboard",
@@ -41,10 +46,6 @@ tab_dashboard, tab_ingredients, tab_meals, tab_business = st.tabs([
     "🍽️ Meals",
     "⚙️ Business Costs",
 ])
-
-# --- PAGE LAYOUT ---
-st.title("📊 Clean Eats Meal Costings")
-st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
 
 # --- SESSION DATA LOAD ---
 DATA_FILE = "data/stored_total_summary.csv"
