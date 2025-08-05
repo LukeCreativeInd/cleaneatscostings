@@ -34,29 +34,52 @@ if not st.session_state.logged_in:
                 st.error("Incorrect password")
     st.stop()
 
-# --- PAGE LAYOUT ---
+# --- HEADER ---
 st.title("📊 Clean Eats Meal Costings")
 st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
 
-# --- PAGE NAVIGATION with dynamic tab order ---
-ALL_TABS = [
+# --- PAGE NAVIGATION via disguised radio tabs ---
+pages = [
     "💰 Costing Dashboard",
     "📋 Ingredients",
     "🍽️ Meals",
     "⚙️ Business Costs",
 ]
-# Default to last visited tab or dashboard
-active_tab = st.session_state.get("last_active_tab", "💰 Costing Dashboard")
-# Order tabs so the active_tab is first
-tab_order = [active_tab] + [t for t in ALL_TABS if t != active_tab]
-tabs = st.tabs(tab_order)
+if "selected_page" not in st.session_state:
+    st.session_state.selected_page = pages[0]
+
+# Hide radio circles and style labels as tabs
+st.markdown(
+    """
+    <style>
+    div[role=\"radiogroup\"] {
+      display: flex;
+      gap: 1rem;
+    }
+    div[role=\"radiogroup\"] input[type=\"radio\"] {
+      display: none;
+    }
+    div[role=\"radiogroup\"] label {
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    div[role=\"radiogroup\"] input[type=\"radio\"]:checked + label {
+      font-weight: bold;
+      border-bottom: 2px solid #000;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+current = st.radio("", pages, index=pages.index(st.session_state.selected_page), key="selected_page", label_visibility="collapsed")
 
 # --- SESSION DATA LOAD ---
 DATA_FILE = "data/stored_total_summary.csv"
 INGREDIENTS_FILE = "data/ingredients.csv"
 BUSINESS_COSTS_FILE = "data/business_costs.csv"
 
-# Initialize dataframes in session state
 if "total_df" not in st.session_state:
     st.session_state.total_df = pd.read_csv(DATA_FILE) if os.path.exists(DATA_FILE) else pd.DataFrame(
         columns=["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]
@@ -70,17 +93,12 @@ if "business_costs_df" not in st.session_state:
         columns=["Name", "Type", "Amount", "Unit"]
     )
 
-# --- RENDER PAGES ---
-for label, tab in zip(tab_order, tabs):
-    with tab:
-        # Persist the current tab for next rerun
-        st.session_state["last_active_tab"] = label
-        # Dispatch to modules
-        if label == "💰 Costing Dashboard":
-            dashboard.render()
-        elif label == "📋 Ingredients":
-            ingredients.render()
-        elif label == "🍽️ Meals":
-            meal_builder.render()
-        else:
-            business_costs.render()
+# --- DISPATCH PAGES ---
+if current == pages[0]:
+    dashboard.render()
+elif current == pages[1]:
+    ingredients.render()
+elif current == pages[2]:
+    meal_builder.render()
+else:
+    business_costs.render()
