@@ -114,7 +114,7 @@ def render():
         if not name:
             st.warning("Enter meal name first.")
             return
-        qty = st.session_state.new_qty
+        qty = st.session_state["new_qty"]
         if qty <= 0:
             st.warning("Quantity must be >0.")
             return
@@ -143,7 +143,7 @@ def render():
         # reset
         st.session_state["meal_name"] = ""
         st.session_state["meal_ingredients"] = pd.DataFrame(columns=df_ing.columns)
-        st.session_state.new_qty = 0.0
+        st.session_state["new_qty"] = 0.0
         st.rerun()
 
     # UI: New Meal
