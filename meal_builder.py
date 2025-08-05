@@ -123,8 +123,10 @@ def render():
         st.session_state["meal_ingredients"] = pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"])
         st.rerun()
 
+    # Initialize form key for Create/Add Meal
+    st.session_state.setdefault("meal_form_key", str(uuid.uuid4()))
+    form_key = st.session_state["meal_form_key"]
     # Create/Add Meal form
-    form_key = st.session_state.get("meal_form_key", str(uuid.uuid4()))
     with st.form(key=form_key):
         st.subheader("Create / Add Meal")
         c1, c2, c3, c4 = st.columns([3,2,2,1])
