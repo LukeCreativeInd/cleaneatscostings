@@ -234,33 +234,44 @@ def render():
                     st.session_state[edit_key] = df_tmp
                     st.experimental_rerun()
 
-            # Add Ingredient in edit
+                        # Add Ingredient in edit
             st.markdown("#### Add Ingredient")
             a1, a2, a3, a4 = st.columns([3,2,2,1])
-            ai = a1.selectbox("", options, key=f"agi_{mn}", label_visibility='collapsed')
-            info_e = ingredients_df[ingredients_df['Ingredient']==ai].iloc[0]
-            bu_e = info_e['Unit Type']
+            ai_key = f"agi_{mn}"
             aq_key = f"aq_{mn}"
             au_key = f"au_{mn}"
             # initialize edit inputs
+            st.session_state.setdefault(ai_key, options[0] if options else "")
             st.session_state.setdefault(aq_key, 0.0)
-            uo_edit = get_display_unit_options(bu_e)
+            uo_edit = get_display_unit_options(ingredients_df[ingredients_df['Ingredient']==st.session_state[ai_key]].iloc[0]['Unit Type'])
             if au_key not in st.session_state or st.session_state[au_key] not in uo_edit:
                 st.session_state[au_key] = uo_edit[0]
-            aq = a2.number_input("", min_value=0.0, step=0.1, key=aq_key, label_visibility='collapsed')
-            au = a3.selectbox("", uo_edit, key=au_key, label_visibility='collapsed')
-            if a4.button("➕", key=f"addit_{mn}") and aq>0:
-                cpu2 = float(info_e['Cost Per Unit'])
-                bq2 = display_to_base(aq, au, bu_e)
+            # Inputs
+            a1.selectbox("", options, key=ai_key, label_visibility='collapsed')
+            a2.number_input("", min_value=0.0, step=0.1, key=aq_key, label_visibility='collapsed')
+            a3.selectbox("", uo_edit, key=au_key, label_visibility='collapsed')
+
+            # Callback to add ingredient
+            def addit_callback(mn, edit_key, ai_key, aq_key, au_key):
+                qty = st.session_state[aq_key]
+                if qty <= 0:
+                    st.warning("Quantity must be >0.")
+                    return
+                ing_sel = st.session_state[ai_key]
+                info_row = ingredients_df[ingredients_df['Ingredient']==ing_sel].iloc[0]
+                cpu2 = float(info_row['Cost Per Unit'])
+                bq2 = display_to_base(qty, st.session_state[au_key], info_row['Unit Type'])
                 tot2 = round(bq2*cpu2,6)
-                entry = {'Ingredient':ai,'Quantity':bq2,'Cost per Unit':cpu2,'Total Cost':tot2,'Input Unit':au}
+                entry = {'Ingredient':ing_sel,'Quantity':bq2,'Cost per Unit':cpu2,'Total Cost':tot2,'Input Unit':st.session_state[au_key]}
                 df_tmp = st.session_state[edit_key]
                 st.session_state[edit_key] = pd.concat([df_tmp, pd.DataFrame([entry])], ignore_index=True)
-                st.success(f"Added {aq}{au} of {ai}")
-                # clear fields
+                st.success(f"Added {qty}{st.session_state[au_key]} of {ing_sel}")
+                # Clear fields
                 st.session_state[aq_key] = 0.0
                 st.session_state[au_key] = uo_edit[0]
                 st.experimental_rerun()
+
+            a4.button("➕", key=f"addit_{mn}", on_click=addit_callback, args=(mn, edit_key, ai_key, aq_key, au_key))
 
             # Save Changes
             if st.button("💾 Save Changes", key=f"sv_{mn}"):
