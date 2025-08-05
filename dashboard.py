@@ -90,19 +90,14 @@ def render():
         axis=1,
     )
 
-    # Editable per-meal summary
+        # Editable per-meal summary
     st.subheader("📦 Per-Meal Cost Summary")
+    # Simple data editor without custom formatting
     editor = st.data_editor(
         summary[["Meal", "Ingredients", "Other Costs", "Sell Price"]],
-        key="cost_editor_final",
+        key="cost_editor_simple",
         use_container_width=True,
         num_rows="dynamic",
-        column_config={
-            "Meal": st.column_config.TextColumn(disabled=True),
-            "Ingredients": st.column_config.NumberColumn(prefix="$", format=",.2f", disabled=True),
-            "Other Costs": st.column_config.NumberColumn(prefix="$", format=",.2f"),
-            "Sell Price": st.column_config.NumberColumn(prefix="$", format=",.2f"),
-        },
     )
 
     # Final summary
