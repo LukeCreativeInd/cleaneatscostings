@@ -101,9 +101,9 @@ def render():
                 key="costing_editor",
                 column_config={
                     "Meal": st.column_config.TextColumn("Meal", disabled=True),
-                    "Ingredients": st.column_config.NumberColumn("Ingredients", format="$ {:.2f}", disabled=True),
-                    "Other Costs": st.column_config.NumberColumn("Other Costs", format="$ {:.2f}"),
-                    "Sell Price": st.column_config.NumberColumn("Sell Price", format="$ {:.2f}"),
+                    "Ingredients": st.column_config.NumberColumn("Ingredients", format="${:.2f}", disabled=True),
+                    "Other Costs": st.column_config.NumberColumn("Other Costs", format="${:.2f}"),
+                    "Sell Price": st.column_config.NumberColumn("Sell Price", format="${:.2f}"),
                 },
             )
 
@@ -120,11 +120,11 @@ def render():
             st.markdown("### Finalized Summary")
             st.dataframe(
                 display_df.style.format({
-                    "Ingredients": "$ {:.2f}",
-                    "Other Costs": "$ {:.2f}",
-                    "Total Cost": "$ {:.2f}",
-                    "Sell Price": "$ {:.2f}",
-                    "Profit Margin": "$ {:.2f}",
+                    "Ingredients": "${:.2f}",
+                    "Other Costs": "${:.2f}",
+                    "Total Cost": "${:.2f}",
+                    "Sell Price": "${:.2f}",
+                    "Profit Margin": "${:.2f}",
                     "Margin %": "{:.1f}%",
                 }),
                 use_container_width=True,
