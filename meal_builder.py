@@ -271,4 +271,3 @@ def render():
                 final_df = pd.concat([others, df_u], ignore_index=True)
                 os.makedirs("data", exist_ok=True)
                 final_df.to_csv(MEAL_DATA_PATH, index=False)
-ewline
