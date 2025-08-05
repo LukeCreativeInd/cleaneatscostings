@@ -16,6 +16,7 @@ def load_stored_summary():
         df = pd.read_csv(SUMMARY_PATH)
         df.columns = df.columns.str.strip().str.title()
         return df
+    # ensure columns exist
     return pd.DataFrame(columns=["Meal", "Other Costs", "Sell Price"])
 
 
@@ -29,19 +30,15 @@ def save_summary_to_github(df: pd.DataFrame):
     except KeyError:
         st.warning("Missing GitHub secrets; saved locally only.")
         return
-    api_url = f"https://api.github.com/repos/{repo}/contents/{SUMMARY_PATH}"
+    url = f"https://api.github.com/repos/{repo}/contents/{SUMMARY_PATH}"
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
-    resp = requests.get(api_url, headers=headers, params={"ref": branch})
+    resp = requests.get(url, headers=headers, params={"ref": branch})
     sha = resp.json().get("sha") if resp.status_code == 200 else None
     content = base64.b64encode(df.to_csv(index=False).encode()).decode()
-    payload = {
-        "message": f"Update costing summary {datetime.utcnow().isoformat()}Z",
-        "content": content,
-        "branch": branch,
-    }
+    payload = {"message": f"Update costing summary {datetime.utcnow().isoformat()}Z", "content": content, "branch": branch}
     if sha:
         payload["sha"] = sha
-    put = requests.put(api_url, headers=headers, json=payload)
+    put = requests.put(url, headers=headers, json=payload)
     if put.status_code not in (200, 201):
         st.error(f"GitHub commit failed: {put.status_code} {put.text}")
 
@@ -50,10 +47,10 @@ def save_summary_to_github(df: pd.DataFrame):
 # ----------------------
 def render():
     st.header("💰 Costing Dashboard")
-    st.markdown("Edit **Other Costs** and **Sell Price** below; totals recalculated automatically.")
+    st.markdown("Edit **Other Costs** and **Sell Price** below; totals recalc automatically.")
 
     if not os.path.exists(MEALS_PATH):
-        st.warning("No meals data found. Create meals first.")
+        st.warning("No meals data found. Create meals first in the Meals tab.")
         return
 
     meals_df = pd.read_csv(MEALS_PATH)
@@ -61,82 +58,85 @@ def render():
         st.warning("No meals in meals.csv. Build a meal first.")
         return
 
-    # Aggregate base costs
-    base = (
-        meals_df.groupby("Meal")["Total Cost"]
-        .sum()
-        .reset_index()
-        .rename(columns={"Total Cost": "Ingredients"})
+    # Aggregate base ingredient costs
+    cost_df = (
+        meals_df.groupby("Meal", as_index=False)
+        .agg(Ingredients=("Total Cost", "sum"))
     )
 
+    # Load stored overrides
     stored = load_stored_summary()
-    merged = base.merge(stored, on="Meal", how="left")
-    merged["Other Costs"] = merged["Other Costs"].fillna(0.0)
-    merged["Sell Price"] = merged["Sell Price"].fillna(
-        merged["Ingredients"] + merged["Other Costs"]
+
+    # Merge and fill defaults
+    summary = pd.merge(cost_df, stored, on="Meal", how="left")
+    summary["Other Costs"] = summary.get("Other Costs", 0.0).fillna(0.0)
+    summary["Sell Price"] = summary.get("Sell Price").fillna(
+        summary["Ingredients"] + summary["Other Costs"]
     )
-    merged["Total Cost"] = merged["Ingredients"] + merged["Other Costs"]
-    merged["Profit Margin"] = merged["Sell Price"] - merged["Total Cost"]
-    merged["Margin %"] = merged.apply(
-        lambda r: (r["Profit Margin"] / r["Sell Price"] * 100) if r["Sell Price"] else 0.0,
+
+    # Compute derived metrics
+    summary["Total Cost"] = summary["Ingredients"] + summary["Other Costs"]
+    summary["Profit Margin"] = summary["Sell Price"] - summary["Total Cost"]
+    summary["Margin %"] = summary.apply(
+        lambda r: (r["Profit Margin"] / r["Sell Price"] * 100)
+        if r["Sell Price"] else 0.0,
         axis=1,
     )
 
-    # Editable summary
+    # Editable per-meal summary
     st.subheader("📦 Per-Meal Cost Summary")
     editor = st.data_editor(
-        merged[["Meal", "Ingredients", "Other Costs", "Sell Price"]],
-        key="costing_editor",
+        summary[["Meal", "Ingredients", "Other Costs", "Sell Price"]],
+        key="cost_editor_v2",
         use_container_width=True,
         num_rows="dynamic",
         column_config={
             "Meal": st.column_config.TextColumn(disabled=True),
-            # Use prefix and D3-style formatting without the $ in the format string
             "Ingredients": st.column_config.NumberColumn(prefix="$", format=",.2f", disabled=True),
             "Other Costs": st.column_config.NumberColumn(prefix="$", format=",.2f"),
             "Sell Price": st.column_config.NumberColumn(prefix="$", format=",.2f"),
         },
     )
 
-    # Recompute derived fields
-    editor["Total Cost"] = editor["Ingredients"] + editor["Other Costs"]
-    editor["Profit Margin"] = editor["Sell Price"] - editor["Total Cost"]
-    editor["Margin %"] = editor.apply(
+    # Recompute and display finalized table
+    final = editor.copy()
+    final["Total Cost"] = final["Ingredients"] + final["Other Costs"]
+    final["Profit Margin"] = final["Sell Price"] - final["Total Cost"]
+    final["Margin %"] = final.apply(
         lambda r: (r["Profit Margin"] / r["Sell Price"] * 100) if r["Sell Price"] else 0.0,
         axis=1,
     )
 
-    # Finalized summary
     st.subheader("🔍 Finalized Summary")
     st.dataframe(
-        editor.style.format({
-            "Ingredients": "${:.2f}",
-            "Other Costs": "${:.2f}",
-            "Total Cost": "${:.2f}",
-            "Sell Price": "${:.2f}",
-            "Profit Margin": "${:.2f}",
+        final.style.format({
+            "Ingredients": "${:,.2f}",
+            "Other Costs": "${:,.2f}",
+            "Total Cost": "${:,.2f}",
+            "Sell Price": "${:,.2f}",
+            "Profit Margin": "${:,.2f}",
             "Margin %": "{:.1f}%",
         }),
         use_container_width=True,
     )
 
     # Aggregate metrics
-    total_ing = editor["Ingredients"].sum()
-    total_other = editor["Other Costs"].sum()
-    total_cost = editor["Total Cost"].sum()
-    total_sell = editor["Sell Price"].sum()
-    total_profit = editor["Profit Margin"].sum()
+    total_ing = final["Ingredients"].sum()
+    total_other = final["Other Costs"].sum()
+    total_cost = final["Total Cost"].sum()
+    total_sell = final["Sell Price"].sum()
+    total_profit = final["Profit Margin"].sum()
     overall = (total_profit / total_sell * 100) if total_sell else 0.0
-    cols = st.columns(6)
-    cols[0].metric("Total Ingredient Cost", f"${total_ing:,.2f}")
-    cols[1].metric("Total Other Costs", f"${total_other:,.2f}")
-    cols[2].metric("Total Cost", f"${total_cost:,.2f}")
-    cols[3].metric("Total Sell Price", f"${total_sell:,.2f}")
-    cols[4].metric("Total Profit", f"${total_profit:,.2f}")
-    cols[5].metric("Overall Margin %", f"{overall:.1f}%")
+    mcols = st.columns(6)
+    mcols[0].metric("Total Ingredient Cost", f"${total_ing:,.2f}")
+    mcols[1].metric("Total Other Costs", f"${total_other:,.2f}")
+    mcols[2].metric("Total Cost", f"${total_cost:,.2f}")
+    mcols[3].metric("Total Sell Price", f"${total_sell:,.2f}")
+    mcols[4].metric("Total Profit", f"${total_profit:,.2f}")
+    mcols[5].metric("Overall Margin %", f"{overall:.1f}%")
 
-    # Save button without rerun
-    if st.button("💾 Save Costing Summary", key="save_summary_button"):
-        final_df = editor[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
-        save_summary_to_github(final_df)
+    # Save button
+    if st.button("💾 Save Costing Summary", key="save_summary_v2"):
+        to_save = final[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
+        save_summary_to_github(to_save)
         st.success("✅ Costing summary saved and committed.")
