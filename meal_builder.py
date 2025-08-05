@@ -270,4 +270,4 @@ with form_container.form(key=st.session_state["new_meal_form_key"]):
                 st.success(f"✅ Changes saved for {final_name}!")
                 del st.session_state[edit_key]
                 del st.session_state['editing_meal']
-                st.rerun()
+                st.rerun() 
