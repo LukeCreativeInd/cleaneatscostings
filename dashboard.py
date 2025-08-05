@@ -68,11 +68,19 @@ def render():
     stored = load_stored_summary()
 
     # Merge and fill defaults
-    summary = pd.merge(cost_df, stored, on="Meal", how="left")
-    summary["Other Costs"] = summary.get("Other Costs", 0.0).fillna(0.0)
-    summary["Sell Price"] = summary.get("Sell Price").fillna(
-        summary["Ingredients"] + summary["Other Costs"]
-    )
+        summary = pd.merge(cost_df, stored, on="Meal", how="left")
+    # Ensure 'Other Costs' exists and fill nulls
+    if "Other Costs" not in summary.columns:
+        summary["Other Costs"] = 0.0
+    else:
+        summary["Other Costs"] = summary["Other Costs"].fillna(0.0)
+    # Ensure 'Sell Price' exists and fill nulls from ingredients + other costs
+    if "Sell Price" not in summary.columns:
+        summary["Sell Price"] = summary["Ingredients"] + summary["Other Costs"]
+    else:
+        summary["Sell Price"] = summary["Sell Price"].fillna(
+            summary["Ingredients"] + summary["Other Costs"]
+        )
 
     # Compute derived metrics
     summary["Total Cost"] = summary["Ingredients"] + summary["Other Costs"]
