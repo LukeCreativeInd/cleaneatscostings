@@ -146,21 +146,29 @@ def render():
         st.session_state["new_qty"] = 0.0
         st.rerun()
 
-    # UI: New Meal
+    # UI: New Meal (wrapped in form to allow resetting)
+import uuid
+st.session_state.setdefault("new_meal_form_key", str(uuid.uuid4()))
+form_container = st.empty()
+with form_container.form(key=st.session_state["new_meal_form_key"]):
     st.subheader("Create / Add Meal")
     c1, c2, c3, c4 = st.columns([3,2,2,1])
-    with c1:
-        st.text_input("Meal Name", key="meal_name")
-    with c2:
-        st.selectbox("Ingredient", options, key="new_ing")
-    with c3:
-        st.number_input("Qty", min_value=0.0, step=0.1, key="new_qty")
-        st.selectbox("Unit", unit_opts0, key="new_unit")
-    with c4:
-        if st.button("➕ Add Ingredient"):
-            add_callback()
-
-    # Display unsaved ingredients
+    # Local inputs within form
+    name = c1.text_input("Meal Name", value=st.session_state.get("meal_name", ""), key="meal_name_form")
+    ing = c2.selectbox("Ingredient", options, key="new_ing_form")
+    qty = c3.number_input("Qty", min_value=0.0, step=0.1, key="new_qty_form")
+    unit = c3.selectbox("Unit", unit_opts0, key="new_unit_form")
+    add = c4.form_submit_button("➕ Add Ingredient")
+    if add:
+        # transfer form state to main session keys
+        st.session_state["meal_name"] = name
+        st.session_state["new_ing"] = ing
+        st.session_state["new_qty"] = qty
+        st.session_state["new_unit"] = unit
+        add_callback()
+        # reset the form for fresh inputs
+        st.session_state["new_meal_form_key"] = str(uuid.uuid4())
+# Display unsaved ingredients
     if not st.session_state.meal_ingredients.empty:
         st.subheader(f"🧾 Ingredients for '{st.session_state.meal_name}' (unsaved)")
         temp = st.session_state.meal_ingredients.copy()
