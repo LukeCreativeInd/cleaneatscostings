@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import requests
 import base64
+import uuid
 from datetime import datetime
 
 MEAL_DATA_PATH = "data/meals.csv"
@@ -90,109 +91,86 @@ def render():
     st.header("🍽️ Meal Builder")
     st.info("Build meals by adding ingredients with quantities; then save and edit meals.")
 
+    # Load data
     meals_df = load_meals()
     ingredients_df = load_ingredients()
     options = sorted(ingredients_df["Ingredient"].unique())
 
-    # Session defaults for new meal
+    # Session defaults
     st.session_state.setdefault("meal_name", "")
-    st.session_state.setdefault(
-        "meal_ingredients",
-        pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"]),
-    )
-    st.session_state.setdefault("new_qty", 0.0)
-    st.session_state.setdefault("new_ing", options[0] if options else "")
-    # Determine unit options for new meal
-    base0 = ingredients_df.loc[ingredients_df["Ingredient"].str.lower() == st.session_state.new_ing.lower(), "Unit Type"].iat[0] if options else "unit"
-    unit_opts0 = get_display_unit_options(base0)
-    if st.session_state.get("new_unit") not in unit_opts0:
-        st.session_state.new_unit = unit_opts0[0]
+    st.session_state.setdefault("meal_ingredients", pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"]))
 
-    # Callbacks
+    # Callbacks modify session state then rerun
     def add_callback():
-        name = st.session_state.meal_name.strip()
-        if not name:
-            st.warning("Enter meal name first.")
-            return
+        name = st.session_state["meal_name"]
         qty = st.session_state["new_qty"]
-        if qty <= 0:
-            st.warning("Quantity must be >0.")
-            return
-        row = ingredients_df[ingredients_df["Ingredient"].str.lower() == st.session_state.new_ing.lower()].iloc[0]
+        row = ingredients_df[ingredients_df["Ingredient"] == st.session_state["new_ing"]].iloc[0]
         cpu = float(row["Cost Per Unit"])
-        bq = display_to_base(qty, st.session_state.new_unit, row["Unit Type"])
+        bq = display_to_base(qty, st.session_state["new_unit"], row["Unit Type"])
         total = round(bq * cpu, 6)
-        entry = {"Ingredient":row["Ingredient"],"Quantity":bq,"Cost per Unit":cpu,"Total Cost":total,"Input Unit":st.session_state.new_unit}
-        st.session_state.meal_ingredients = pd.concat([st.session_state.meal_ingredients, pd.DataFrame([entry])], ignore_index=True)
-        st.success(f"Added {qty}{st.session_state.new_unit} of {row['Ingredient']}")
-        # reset
-        st.session_state["new_qty"] = 0.0
+        entry = {"Ingredient":row["Ingredient"],"Quantity":bq,"Cost per Unit":cpu,"Total Cost":total,"Input Unit":st.session_state["new_unit"]}
+        st.session_state["meal_ingredients"] = pd.concat([st.session_state["meal_ingredients"], pd.DataFrame([entry])], ignore_index=True)
+        st.success(f"Added {qty}{st.session_state['new_unit']} of {row['Ingredient']}")
         st.rerun()
 
     def save_callback():
-        name = st.session_state.meal_name.strip()
-        df_ing = st.session_state.meal_ingredients
-        if not name or df_ing.empty:
-            st.warning("Meal name & at least one ingredient required.")
-            return
-        combined = pd.concat([meals_df, df_ing.assign(Meal=name)], ignore_index=True)
+        combined = pd.concat([meals_df, st.session_state["meal_ingredients"].assign(Meal=st.session_state["meal_name"])], ignore_index=True)
         os.makedirs("data", exist_ok=True)
         combined.to_csv(MEAL_DATA_PATH, index=False)
         commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
         st.success("✅ Meal saved!")
-        # reset
         st.session_state["meal_name"] = ""
-        st.session_state["meal_ingredients"] = pd.DataFrame(columns=df_ing.columns)
-        st.session_state["new_qty"] = 0.0
+        st.session_state["meal_ingredients"] = pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"])
         st.rerun()
 
-    # UI: New Meal (wrapped in form to allow resetting)
-import uuid
-st.session_state.setdefault("new_meal_form_key", str(uuid.uuid4()))
-form_container = st.empty()
-with form_container.form(key=st.session_state["new_meal_form_key"]):
-    st.subheader("Create / Add Meal")
-    c1, c2, c3, c4 = st.columns([3,2,2,1])
-    # Local inputs within form
-    name = c1.text_input("Meal Name", value=st.session_state.get("meal_name", ""), key="meal_name_form")
-    ing = c2.selectbox("Ingredient", options, key="new_ing_form")
-    qty = c3.number_input("Qty", min_value=0.0, step=0.1, key="new_qty_form")
-    unit = c3.selectbox("Unit", unit_opts0, key="new_unit_form")
-    add = c4.form_submit_button("➕ Add Ingredient")
-    if add:
-        # transfer form state to main session keys
-        st.session_state["meal_name"] = name
-        st.session_state["new_ing"] = ing
-        st.session_state["new_qty"] = qty
-        st.session_state["new_unit"] = unit
-        add_callback()
-        # reset the form for fresh inputs
-        st.session_state["new_meal_form_key"] = str(uuid.uuid4())
-# Display unsaved ingredients
-    if not st.session_state.meal_ingredients.empty:
-        st.subheader(f"🧾 Ingredients for '{st.session_state.meal_name}' (unsaved)")
-        temp = st.session_state.meal_ingredients.copy()
-        temp["Display"] = temp.apply(lambda r: f"{base_to_display(r['Quantity'], base0)[0]:.2f} {r['Input Unit']}", axis=1)
-        st.dataframe(temp[["Ingredient","Display","Cost per Unit","Total Cost"]], use_container_width=True)
+    # Create/Add Meal form
+    form_key = st.session_state.get("meal_form_key", str(uuid.uuid4()))
+    with st.form(key=form_key):
+        st.subheader("Create / Add Meal")
+        c1, c2, c3, c4 = st.columns([3,2,2,1])
+        c1.text_input("Meal Name", key="meal_name")
+        c2.selectbox("Ingredient", options, key="new_ing")
+        c3.number_input("Qty", min_value=0.0, step=0.1, key="new_qty")
+        # Determine unit options per ingredient
+        row = ingredients_df[ingredients_df["Ingredient"] == st.session_state["new_ing"]].iloc[0]
+        unit_opts = get_display_unit_options(row["Unit Type"])
+        c3.selectbox("Unit", unit_opts, key="new_unit")
+        add = c4.form_submit_button("➕ Add Ingredient")
+        if add:
+            if not st.session_state["meal_name"]:
+                st.warning("Enter meal name first.")
+            elif st.session_state["new_qty"] <= 0:
+                st.warning("Quantity must be >0.")
+            else:
+                add_callback()
+            # regenerate form key to reset fields
+            st.session_state["meal_form_key"] = str(uuid.uuid4())
+    
+    # Show unsaved ingredients & Save
+    if not st.session_state["meal_ingredients"].empty:
+        st.subheader(f"🧾 Ingredients for '{st.session_state['meal_name']}' (unsaved)")
+        df_temp = st.session_state["meal_ingredients"].copy()
+        df_temp["Display"] = df_temp.apply(lambda r: f"{base_to_display(r['Quantity'], r['Input Unit'])[0]:.2f} {r['Input Unit']}", axis=1)
+        st.dataframe(df_temp[["Ingredient","Display","Cost per Unit","Total Cost"]], use_container_width=True)
         if st.button("💾 Save Meal"):
             save_callback()
 
-    # UI: List & Edit Meals
+    # Edit saved meals
     st.markdown("---")
     st.subheader("📦 Saved Meals")
-    if not meals_df.empty:
+    if meals_df.empty:
+        st.write("No meals saved yet.")
+    else:
         for meal in sorted(meals_df['Meal'].unique()):
             cols = st.columns([6,1])
             cols[0].markdown(f"**{meal}**")
             if cols[1].button("✏️", key=f"edit_{meal}"):
-                st.session_state.editing_meal = meal
+                st.session_state["editing_meal"] = meal
                 st.rerun()
-    else:
-        st.write("No meals saved yet.")
 
-    # Edit existing meal
+    # Edit modal
     if st.session_state.get("editing_meal"):
-        mn = st.session_state.editing_meal
+        mn = st.session_state["editing_meal"]
         edit_key = f"edit_{mn}_df"
         if edit_key not in st.session_state:
             st.session_state[edit_key] = meals_df[meals_df['Meal']==mn].reset_index(drop=True)
@@ -206,7 +184,7 @@ with form_container.form(key=st.session_state["new_meal_form_key"]):
                 commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Delete meal")
                 st.success(f"Deleted {mn}")
                 del st.session_state[edit_key]
-                del st.session_state['editing_meal']
+                del st.session_state["editing_meal"]
                 st.rerun()
 
             st.markdown("### Ingredients")
@@ -229,33 +207,21 @@ with form_container.form(key=st.session_state["new_meal_form_key"]):
             # Add Ingredient in edit
             st.markdown("#### Add Ingredient")
             a1, a2, a3, a4 = st.columns([3,2,2,1])
-            ai_key = f"agi_{mn}"
-            aq_key = f"aq_{mn}"
-            au_key = f"au_{mn}"
-            st.session_state.setdefault(ai_key, options[0] if options else "")
-            st.session_state.setdefault(aq_key, 0.0)
-            info_e = ingredients_df[ingredients_df['Ingredient']==st.session_state[ai_key]].iloc[0]
-            uo_edit = get_display_unit_options(info_e['Unit Type'])
-            if au_key not in st.session_state or st.session_state[au_key] not in uo_edit:
-                st.session_state[au_key] = uo_edit[0]
-            a1.selectbox("", options, key=ai_key, label_visibility='collapsed')
-            a2.number_input("", min_value=0.0, step=0.1, key=aq_key, label_visibility='collapsed')
-            a3.selectbox("", uo_edit, key=au_key, label_visibility='collapsed')
-            if a4.button("➕", key=f"addit_{mn}"):
-                qty = st.session_state[aq_key]
-                if qty > 0:
-                    row = ingredients_df[ingredients_df['Ingredient']==st.session_state[ai_key]].iloc[0]
-                    cpu2 = float(row['Cost Per Unit'])
-                    bq2 = display_to_base(qty, st.session_state[au_key], row['Unit Type'])
-                    tot2 = round(bq2*cpu2,6)
-                    entry = {'Ingredient':st.session_state[ai_key],'Quantity':bq2,'Cost per Unit':cpu2,'Total Cost':tot2,'Input Unit':st.session_state[au_key]}
-                    st.session_state[edit_key] = pd.concat([st.session_state[edit_key], pd.DataFrame([entry])], ignore_index=True)
-                    st.success(f"Added {qty}{st.session_state[au_key]} of {st.session_state[ai_key]}")
-                    st.session_state[aq_key] = 0.0
-                    st.session_state[au_key] = uo_edit[0]
-                    st.rerun()
+            ai = a1.selectbox("", options, key=f"agi_{mn}", label_visibility='collapsed')
+            info_e = ingredients_df[ingredients_df['Ingredient']==ai].iloc[0]
+            bu_e = info_e['Unit Type']
+            aq = a2.number_input("", min_value=0.0, step=0.1, key=f"aq_{mn}", label_visibility='collapsed')
+            au_opts = get_display_unit_options(bu_e)
+            au = a3.selectbox("", au_opts, key=f"au_{mn}", label_visibility='collapsed')
+            if a4.button("➕", key=f"addit_{mn}") and aq>0:
+                cpu2 = float(info_e['Cost Per Unit'])
+                bq2 = display_to_base(aq, au, bu_e)
+                tot2 = round(bq2*cpu2,6)
+                entry = {'Ingredient':ai,'Quantity':bq2,'Cost per Unit':cpu2,'Total Cost':tot2,'Input Unit':au}
+                st.session_state[edit_key] = pd.concat([st.session_state[edit_key], pd.DataFrame([entry])], ignore_index=True)
+                st.success(f"Added {aq}{au} of {ai}")
+                st.rerun()
 
-            # Save Changes
             if st.button("💾 Save Changes", key=f"sv_{mn}"):
                 final_name = st.session_state[f"rename_{mn}"].strip() or mn
                 df_u = st.session_state[edit_key]
@@ -269,5 +235,5 @@ with form_container.form(key=st.session_state["new_meal_form_key"]):
                 commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
                 st.success(f"✅ Changes saved for {final_name}!")
                 del st.session_state[edit_key]
-                del st.session_state['editing_meal']
-                st.rerun() 
+                del st.session_state["editing_meal"]
+                st.rerun()
