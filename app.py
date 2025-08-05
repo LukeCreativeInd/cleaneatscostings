@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 
-# Modular pages
-import dashboard
+# Modular pages\import dashboard
 import ingredients
 import meal_builder
 import business_costs
@@ -34,67 +33,23 @@ if not st.session_state.logged_in:
                 st.error("Incorrect password")
     st.stop()
 
-# --- PAGE NAVIGATION ---
-# Use a horizontal radio to emulate tabs and preserve selection across reruns
-pages = [
+# --- PAGE NAVIGATION via built-in tabs ---
+tab_dashboard, tab_ingredients, tab_meals, tab_business = st.tabs([
     "💰 Costing Dashboard",
     "📋 Ingredients",
     "🍽️ Meals",
     "⚙️ Business Costs",
-]
-if "selected_page" not in st.session_state:
-    st.session_state.selected_page = pages[0]
+])
 
-# Inject CSS to style the radio like tabs
-st.markdown(
-    '''
-    <style>
-    /* Container flex row */
-    div[role="radiogroup"] {
-        display: flex;
-        padding: 0;
-        margin: 0;
-    }
-    /* Each label as a flex item */
-    div[role="radiogroup"] label {
-        flex: 1;
-        padding: 0;
-        margin: 0;
-        cursor: pointer;
-    }
-    /* Hide the circle inputs */
-    div[role="radiogroup"] label input[type="radio"] {
-        display: none !important;
-    }
-    /* Style the inner text container */
-    div[role="radiogroup"] label > div {
-        padding: 0.75rem 1rem;
-        text-align: center;
-        border-bottom: 2px solid transparent;
-    }
-    /* Highlight selected tab */
-    div[role="radiogroup"] label input[type="radio"]:checked + div {
-        font-weight: bold;
-        border-bottom-color: #FFF;
-    }
-    </style>
-    ''',
-    unsafe_allow_html=True,
-)
-
-
-# Render navigation
-current = st.radio("", pages,
-                   index=pages.index(st.session_state.selected_page),
-                   key="selected_page",
-                   label_visibility="collapsed")
+# --- PAGE LAYOUT ---
+st.title("📊 Clean Eats Meal Costings")
+st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
 
 # --- SESSION DATA LOAD ---
 DATA_FILE = "data/stored_total_summary.csv"
 INGREDIENTS_FILE = "data/ingredients.csv"
 BUSINESS_COSTS_FILE = "data/business_costs.csv"
 
-# Initialize if not in session
 if "total_df" not in st.session_state:
     st.session_state.total_df = pd.read_csv(DATA_FILE) if os.path.exists(DATA_FILE) else pd.DataFrame(
         columns=["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]
@@ -108,16 +63,12 @@ if "business_costs_df" not in st.session_state:
         columns=["Name", "Type", "Amount", "Unit"]
     )
 
-# --- PAGE LAYOUT ---
-st.title("📊 Clean Eats Meal Costings")
-st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
-
-# Dispatch to the correct page
-if current == "💰 Costing Dashboard":
+# --- RENDER PAGES ---
+with tab_dashboard:
     dashboard.render()
-elif current == "📋 Ingredients":
+with tab_ingredients:
     ingredients.render()
-elif current == "🍽️ Meals":
+with tab_meals:
     meal_builder.render()
-elif current == "⚙️ Business Costs":
+with tab_business:
     business_costs.render()
