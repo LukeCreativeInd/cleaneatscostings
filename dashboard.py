@@ -99,9 +99,9 @@ def render():
         num_rows="dynamic",
         column_config={
             "Meal": st.column_config.TextColumn(disabled=True),
-            "Ingredients": st.column_config.NumberColumn(format="$,.2f", disabled=True),
-            "Other Costs": st.column_config.NumberColumn(format="$,.2f"),
-            "Sell Price": st.column_config.NumberColumn(format="$,.2f"),
+            "Ingredients": st.column_config.NumberColumn(prefix="$", format=",.2f", disabled=True),
+            "Other Costs": st.column_config.NumberColumn(prefix="$", format=",.2f"),
+            "Sell Price": st.column_config.NumberColumn(prefix="$", format=",.2f"),
         },
     )
 
