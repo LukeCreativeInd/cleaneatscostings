@@ -20,10 +20,8 @@ def load_stored_summary():
 
 
 def save_summary_to_github(df: pd.DataFrame):
-    # Write locally
     os.makedirs(os.path.dirname(SUMMARY_PATH), exist_ok=True)
     df.to_csv(SUMMARY_PATH, index=False)
-    # Commit to GitHub
     try:
         token = st.secrets["github_token"]
         repo = st.secrets["github_repo"]
@@ -93,9 +91,10 @@ def render():
         num_rows="dynamic",
         column_config={
             "Meal": st.column_config.TextColumn(disabled=True),
-            "Ingredients": st.column_config.NumberColumn(format="$,.2f", disabled=True),
-            "Other Costs": st.column_config.NumberColumn(format="$,.2f"),
-            "Sell Price": st.column_config.NumberColumn(format="$,.2f"),
+            # Use prefix and D3-style formatting without the $ in the format string
+            "Ingredients": st.column_config.NumberColumn(prefix="$", format=",.2f", disabled=True),
+            "Other Costs": st.column_config.NumberColumn(prefix="$", format=",.2f"),
+            "Sell Price": st.column_config.NumberColumn(prefix="$", format=",.2f"),
         },
     )
 
@@ -136,7 +135,7 @@ def render():
     cols[4].metric("Total Profit", f"${total_profit:,.2f}")
     cols[5].metric("Overall Margin %", f"{overall:.1f}%")
 
-    # Save button without re-import
+    # Save button without rerun
     if st.button("💾 Save Costing Summary", key="save_summary_button"):
         final_df = editor[["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]]
         save_summary_to_github(final_df)
