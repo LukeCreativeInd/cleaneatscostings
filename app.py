@@ -16,58 +16,50 @@ st.set_page_config(page_title="Clean Eats Costings", layout="wide")
 # Use .get to avoid KeyError if unset
 password = st.secrets.get("access_password")
 if password is None:
-    st.error("⚠️ Access password not configured in secrets['access_password'].")
+    st.error("⚠️ Access password not configured in secrets['access_password'.]")
     st.stop()
-SESSION_TIMEOUT = 3600  # 1 hour
 
-# --- FILE PATHS ---
-DATA_FILE = "stored_total_summary.csv"
-INGREDIENTS_FILE = "ingredients.csv"
-BUSINESS_COSTS_FILE = "business_costs.csv"
+# --- SESSION LOGIN STATE ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# --- SESSION SETUP ---
-def initialize_data():
-    return pd.read_csv(DATA_FILE) if os.path.exists(DATA_FILE) else pd.DataFrame(
-        columns=["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]
-    )
-
-def initialize_ingredients():
-    return pd.read_csv(INGREDIENTS_FILE) if os.path.exists(INGREDIENTS_FILE) else pd.DataFrame(
-        columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost per Unit"]
-    )
-
-def initialize_business_costs():
-    return pd.read_csv(BUSINESS_COSTS_FILE) if os.path.exists(BUSINESS_COSTS_FILE) else pd.DataFrame(
-        columns=["Name", "Type", "Amount", "Unit"]
-    )
-
-def save_data(df):
-    df.to_csv(DATA_FILE, index=False)
-
-def save_ingredients(df):
-    df.to_csv(INGREDIENTS_FILE, index=False)
-
-def save_business_costs(df):
-    df.to_csv(BUSINESS_COSTS_FILE, index=False)
-
-# --- LOGIN CHECK ---
-query_params = st.experimental_get_query_params()
-logged_in = query_params.get("access", [None])[0] == "ok"
-
-if not logged_in:
+if not st.session_state.logged_in:
     with st.form("login_form"):
         st.subheader("🔐 Enter Access Password")
         input_pw = st.text_input("Password", type="password")
         submitted = st.form_submit_button("Login")
         if submitted:
             if input_pw == password:
-                st.experimental_set_query_params(access="ok")
-                st.experimental_rerun()
+                st.session_state.logged_in = True
+                st.rerun()
             else:
                 st.error("Incorrect password")
     st.stop()
 
-# --- LOAD DATA TO SESSION ---
+# --- FILE PATHS & INITIALIZERS ---
+DATA_FILE = "data/stored_total_summary.csv"
+INGREDIENTS_FILE = "data/ingredients.csv"
+BUSINESS_COSTS_FILE = "data/business_costs.csv"
+
+
+def initialize_data():
+    return pd.read_csv(DATA_FILE) if os.path.exists(DATA_FILE) else pd.DataFrame(
+        columns=["Meal", "Ingredients", "Other Costs", "Total Cost", "Sell Price"]
+    )
+
+
+def initialize_ingredients():
+    return pd.read_csv(INGREDIENTS_FILE) if os.path.exists(INGREDIENTS_FILE) else pd.DataFrame(
+        columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost per Unit"]
+    )
+
+
+def initialize_business_costs():
+    return pd.read_csv(BUSINESS_COSTS_FILE) if os.path.exists(BUSINESS_COSTS_FILE) else pd.DataFrame(
+        columns=["Name", "Type", "Amount", "Unit"]
+    )
+
+# --- SESSION DATA LOAD ---
 if "total_df" not in st.session_state:
     st.session_state.total_df = initialize_data()
 
