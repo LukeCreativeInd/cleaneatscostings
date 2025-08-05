@@ -126,7 +126,7 @@ def render():
         st.session_state.meal_ingredients = pd.concat([st.session_state.meal_ingredients, pd.DataFrame([entry])], ignore_index=True)
         st.success(f"Added {qty}{st.session_state.new_unit} of {row['Ingredient']}")
         # reset
-        st.session_state.new_qty = 0.0
+        st.session_state["new_qty"] = 0.0
         st.rerun()
 
     def save_callback():
@@ -141,8 +141,8 @@ def render():
         commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
         st.success("✅ Meal saved!")
         # reset
-        st.session_state.meal_name = ""
-        st.session_state.meal_ingredients = pd.DataFrame(columns=df_ing.columns)
+        st.session_state["meal_name"] = ""
+        st.session_state["meal_ingredients"] = pd.DataFrame(columns=df_ing.columns)
         st.session_state.new_qty = 0.0
         st.rerun()
 
