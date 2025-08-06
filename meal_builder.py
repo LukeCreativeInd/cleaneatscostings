@@ -223,7 +223,7 @@ def render():
                     if cols[4].button("Remove", key=f"rem_{mn}_{idx}"):
                         df_edit = df_edit.drop(idx).reset_index(drop=True)
                         st.session_state[f"edit_{mn}"] = df_edit
-                        st.experimental_rerun()
+                        
                 # add new ingredient row
                 st.markdown("### Add Ingredient")
                 a1, a2, a3, a4 = st.columns([3,2,2,1])
@@ -240,7 +240,7 @@ def render():
                     new_entry = {"Ingredient": new_ing, "Quantity": bq2, "Cost per Unit": cpu2, "Total Cost": tot2, "Input Unit": new_unit}
                     df_edit = pd.concat([df_edit, pd.DataFrame([new_entry])], ignore_index=True)
                     st.session_state[f"edit_{mn}"] = df_edit
-                    st.experimental_rerun()
+                    
                                 # save changes
                 if st.button("💾 Save Changes", key=f"sv_{mn}"):
                     final = st.session_state[f"edit_{mn}"]
