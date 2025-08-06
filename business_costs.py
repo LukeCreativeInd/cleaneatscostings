@@ -39,18 +39,17 @@ UNIT_OPTIONS = [
 # ----------------------
 def load_business_costs():
     """
-    Load business costs from CSV. If date columns exist, parse them.
+    Load business costs from CSV if present; parse date columns if available.
     """
     if os.path.exists(DATA_PATH):
         df = pd.read_csv(DATA_PATH)
         # Standardize column names
         df.columns = [col.strip() for col in df.columns]
-        # Parse date columns if present
+        # Parse date columns
         for date_col in ["Effective From", "End Date"]:
             if date_col in df.columns:
                 df[date_col] = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
         return df
-    # Return empty with correct columns if no file
     return pd.DataFrame(
         columns=["Name", "Cost Type", "Amount", "Unit", "Effective From", "End Date"]
     )
@@ -71,7 +70,7 @@ def render():
 
     # Add new cost form
     st.subheader("Add New Business Cost")
-    with st.form("add_cost_form", clear_on_submit=False):
+    with st.form("add_cost_form"):  # clear_on_submit omitted to control rerun manually
         c1, c2 = st.columns(2)
         name = c1.text_input("Cost Name")
         cost_type = c2.selectbox("Cost Type", COST_TYPE_OPTIONS)
@@ -100,7 +99,7 @@ def render():
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                 save_business_costs(df)
                 st.success(f"Added cost '{name.strip()}' successfully.")
-                st.experimental_rerun()
+                st.rerun()
 
     # Display and edit existing costs
     st.subheader("Existing Business Costs")
