@@ -241,8 +241,8 @@ def render():
                     df_edit = pd.concat([df_edit, pd.DataFrame([new_entry])], ignore_index=True)
                     st.session_state[f"edit_{mn}"] = df_edit
                     st.experimental_rerun()
-                # save changes
-                if st.button("💾 Save Changes", key=f"sv_{mn}"):, key=f"sv_{mn}"):
+                                # save changes
+                if st.button("💾 Save Changes", key=f"sv_{mn}"):
                     final = st.session_state[f"edit_{mn}"]
                     final['Meal'] = st.session_state[f"rename_{mn}"].strip() or mn
                     final['Sell Price'] = st.session_state[f"sellprice_{mn}"]
