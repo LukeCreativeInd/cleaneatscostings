@@ -5,14 +5,15 @@ import os
 # ----------------------
 # Config
 # ----------------------
-MEAL_SUMMARY_PATH   = "data/stored_total_summary.csv"
+MEAL_SUMMARY_PATH   = "data/stored_total_summary.csv"  # no longer used for overrides
 BUSINESS_COSTS_PATH = "data/business_costs.csv"
 
 # ----------------------
 # Data loaders
 # ----------------------
 def load_meal_summary():
-    """Generate the meal summary by aggregating data/meals.csv and applying stored overrides."""
+    """Generate the meal summary by aggregating data/meals.csv
+       and pulling live Sell Price directly from it."""
     meals_path = "data/meals.csv"
 
     # 1) Aggregate raw ingredient costs
@@ -27,54 +28,25 @@ def load_meal_summary():
         )
     else:
         ing_totals = pd.DataFrame({"Meal": [], "Ingredients": []})
+        mdf = pd.DataFrame(columns=["Meal", "Sell Price"])
 
-    # 2) Load stored overrides
-    if os.path.exists(MEAL_SUMMARY_PATH):
-        stored = pd.read_csv(MEAL_SUMMARY_PATH)
-        stored.columns = [c.strip() for c in stored.columns]
-    else:
-        stored = pd.DataFrame(columns=["Meal", "Other Costs", "Sell Price"])
-
-    # 3) Merge with suffixes
-    summary = pd.merge(
-        ing_totals,
-        stored,
-        on="Meal",
-        how="outer",
-        suffixes=("", "_stored")
+    # 2) Pull latest sell price from meals.csv
+    price_df = (
+        mdf[["Meal", "Sell Price"]]
+          .drop_duplicates(subset="Meal", keep="last")
     )
 
-    # 4) Ensure Ingredients
-    if "Ingredients" in summary.columns:
-        summary["Ingredients"] = summary["Ingredients"].fillna(0)
-    elif "Ingredients_stored" in summary.columns:
-        summary["Ingredients"] = summary["Ingredients_stored"].fillna(0)
-    else:
-        summary["Ingredients"] = 0
+    # 3) Merge ingredient totals with sell prices
+    summary = ing_totals.merge(price_df, on="Meal", how="left")
 
-    # 5) Ensure Other Costs
-    if "Other Costs" in summary.columns:
-        summary["Other Costs"] = summary["Other Costs"].fillna(0)
-    elif "Other Costs_stored" in summary.columns:
-        summary["Other Costs"] = summary["Other Costs_stored"].fillna(0)
-    else:
-        summary["Other Costs"] = 0
+    # 4) Default Other Costs to zero (no overrides file)
+    summary["Other Costs"] = 0.0
 
-    # 6) Ensure Sell Price
-    if "Sell Price" in summary.columns:
-        summary["Sell Price"] = summary["Sell Price"].fillna(summary["Ingredients"])
-    elif "Sell Price_stored" in summary.columns:
-        summary["Sell Price"] = summary["Sell Price_stored"].fillna(summary["Ingredients"])
-    else:
-        summary["Sell Price"] = summary["Ingredients"]
+    # 5) Default Sell Price to Ingredients cost if missing
+    summary["Sell Price"] = summary["Sell Price"].fillna(summary["Ingredients"])
 
-    # 7) Compute Total Cost
+    # 6) Compute Total Cost
     summary["Total Cost"] = summary["Ingredients"] + summary["Other Costs"]
-
-    # 8) Drop suffixed columns
-    for col in list(summary.columns):
-        if col.endswith("_stored"):
-            summary.drop(columns=[col], inplace=True)
 
     return summary
 
@@ -91,6 +63,7 @@ def load_business_costs():
         return df[cols]
     return pd.DataFrame(columns=cols)
 
+
 # ----------------------
 # Calculations
 # ----------------------
@@ -106,6 +79,7 @@ def compute_business_per_meal(cost_row):
     if unit == "per month":
         return amt / meals_month
     return 0.0
+
 
 # ----------------------
 # Main render
@@ -162,3 +136,7 @@ def render():
             bc_df[["Name", "Cost Type", "Amount", "Unit", "Cost per Meal"]],
             use_container_width=True
         )
+
+
+if __name__ == "__main__":
+    render()
