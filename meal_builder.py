@@ -187,16 +187,13 @@ def render():
         d1.selectbox("Ingredient", opts, key="new_ing")
         d2.number_input("Qty/Amt", min_value=0.0, step=0.1, key="new_qty")
         base = ing_df[ing_df["Ingredient"] == st.session_state["new_ing"]]
-        uopts = get_display_unit_options(base.iloc[0]["Unit Type"] ) if not base.empty else ["unit"]
+        uopts = get_display_unit_options(base.iloc[0]["Unit Type"]) if not base.empty else ["unit"]
         d3.selectbox("Unit", uopts, key="new_unit")
-        if d4.form_submit_button("➕ Add Ingredient"):
-            if not st.session_state["meal_name"].strip():
-                st.warning("Enter a meal name first.")
-            elif st.session_state["new_qty"] <= 0:
-                st.warning("Quantity must be > 0.")
-            else:
-                add_temp()
+        # Use callback so we can modify session_state safely before widgets are instantiated
+        d4.form_submit_button("➕ Add Ingredient", on_click=add_temp)
 
+        # Save meal
+        st.form_submit_button("💾 Save Meal", on_click=save_new_meal)
         if st.form_submit_button("💾 Save Meal"):
             if st.session_state["meal_ingredients"].empty:
                 st.warning("Add at least one ingredient.")
