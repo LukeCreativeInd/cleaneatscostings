@@ -129,6 +129,29 @@ def select_edit(meal_name):
     st.session_state["editing_meal"] = meal_name
     st.session_state[f"edit_{meal_name}"] = meals_df[meals_df['Meal'] == meal_name].reset_index(drop=True)
 
+# Add ingredient in edit mode
+
+def add_edit_callback(meal_name):
+    ing_df = load_ingredients()
+    df_edit = st.session_state[f"edit_{meal_name}"]
+    key_i = f"new_ing_edit_{meal_name}"
+    key_q = f"new_qty_edit_{meal_name}"
+    key_u = f"new_unit_edit_{meal_name}"
+    new_i = st.session_state.get(key_i)
+    new_q = st.session_state.get(key_q)
+    new_u = st.session_state.get(key_u)
+    row2 = ing_df[ing_df['Ingredient'] == new_i].iloc[0]
+    bq3 = display_to_base(new_q, new_u, row2['Unit Type'])
+    tot3 = round(bq3 * float(row2['Cost Per Unit']), 6)
+    newrow = {
+        'Ingredient': new_i,
+        'Quantity': bq3,
+        'Cost per Unit': float(row2['Cost Per Unit']),
+        'Total Cost': tot3,
+        'Input Unit': new_u
+    }
+    st.session_state[f"edit_{meal_name}"] = pd.concat([df_edit, pd.DataFrame([newrow])], ignore_index=True)
+
 # Main UI
 
 def render():
