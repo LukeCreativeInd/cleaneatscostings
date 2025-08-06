@@ -91,7 +91,7 @@ def add_temp():
     row = ing_df[ing_df["Ingredient"] == sel].iloc[0]
     qty = st.session_state["new_qty"]
     base_qty = display_to_base(qty, st.session_state["new_unit"], row["Unit Type"])
-    cpu = float(row["Cost Per Unit"])
+    cpu = float(row["Cost per Unit"])
     total = round(base_qty * cpu, 6)
     entry = {
         "Ingredient": sel,
@@ -103,7 +103,8 @@ def add_temp():
     st.session_state["meal_ingredients"] = pd.concat([
         st.session_state["meal_ingredients"], pd.DataFrame([entry])
     ], ignore_index=True)
-    # clear only entry fields
+    # Re-run the app to reset entry form fields
+    st.rerun()
     st.session_state["new_ing"] = opts[0]
     st.session_state["new_qty"] = 0.0
     st.session_state["new_unit"] = get_display_unit_options(row["Unit Type"])[0]
