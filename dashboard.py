@@ -5,24 +5,30 @@ import os
 # ----------------------
 # Config
 # ----------------------
-MEAL_SUMMARY_PATH = "data/stored_total_summary.csv"
+MEAL_SUMMARY_PATH   = "data/stored_total_summary.csv"
 BUSINESS_COSTS_PATH = "data/business_costs.csv"
 
 # ----------------------
 # Data loaders
 # ----------------------
 def load_meal_summary():
-    """Generate the meal summary from meals.csv and stored cost overrides."""
+    """
+    Generate the meal summary by:
+      1) Summing up Total Cost from data/meals.csv into an Ingredients column
+      2) Merging in stored Other Costs & Sell Price overrides
+      3) Filling defaults and computing Total Cost = Ingredients + Other Costs
+    """
     meals_path = "data/meals.csv"
-    # 1) Ingredient totals from raw meals
+
+    # 1) Ingredient aggregation
     if os.path.exists(meals_path):
         mdf = pd.read_csv(meals_path)
         mdf.columns = [c.strip() for c in mdf.columns]
         ing_totals = (
             mdf.groupby("Meal")["Total Cost"]
-            .sum()
-            .reset_index()
-            .rename(columns={"Total Cost": "Ingredients"})
+               .sum()
+               .reset_index()
+               .rename(columns={"Total Cost": "Ingredients"})
         )
     else:
         ing_totals = pd.DataFrame({"Meal": [], "Ingredients": []})
@@ -34,29 +40,19 @@ def load_meal_summary():
     else:
         stored = pd.DataFrame(columns=["Meal", "Other Costs", "Sell Price"])
 
-    # 3) Merge
+    # 3) Merge & fill
     summary = pd.merge(ing_totals, stored, on="Meal", how="outer")
+    summary["Ingredients"]  = summary.get("Ingredients", 0).fillna(0)
+    summary["Other Costs"]  = summary.get("Other Costs", 0).fillna(0)
+    summary["Sell Price"]   = summary.get("Sell Price", summary["Ingredients"]).fillna(summary["Ingredients"])
+    summary["Total Cost"]   = summary["Ingredients"] + summary["Other Costs"]
 
-    # 4) Ensure columns exist
-    if "Ingredients" not in summary:
-        summary["Ingredients"] = 0
-    if "Other Costs" not in summary:
-        summary["Other Costs"] = 0
-    if "Sell Price" not in summary:
-        summary["Sell Price"] = summary["Ingredients"]
-
-    # 5) Fill NaNs
-    summary["Ingredients"] = summary["Ingredients"].fillna(0)
-    summary["Other Costs"] = summary["Other Costs"].fillna(0)
-    summary["Sell Price"] = summary["Sell Price"].fillna(summary["Ingredients"])
-
-    # 6) Total Cost
-    summary["Total Cost"] = summary["Ingredients"] + summary["Other Costs"]
     return summary
 
-
 def load_business_costs():
-    """Load business costs with Usage Factor, ensuring expected columns exist."""
+    """
+    Load business costs, ensuring the key columns exist.
+    """
     cols = ["Name", "Cost Type", "Amount", "Unit", "Usage Factor"]
     if os.path.exists(BUSINESS_COSTS_PATH):
         df = pd.read_csv(BUSINESS_COSTS_PATH)
@@ -72,26 +68,30 @@ def load_business_costs():
 # ----------------------
 def compute_business_per_meal(cost_row):
     """
-    Compute per-meal allocation for a single business cost line:
-      - "per item": Amount * Usage Factor
-      - "per month": Amount / meals_this_month
-      - "per week": Amount / (meals_this_month / 4)
-      - else: Amount / Usage Factor
+    Compute per-meal allocation from one cost line:
+      • per item  => Amount * Usage Factor  (items per meal)
+      • per meal  => Amount                 (flat per meal)
+      • per month => Amount / meals_this_month
+      • per week  => Amount / (meals_this_month / 4)
+      • otherwise => Amount / Usage Factor
     """
-    amt = cost_row.get("Amount", 0) or 0
+    amt   = cost_row.get("Amount", 0) or 0
     usage = cost_row.get("Usage Factor", 0) or 0
-    unit = cost_row.get("Unit", "per meal")
+    unit  = cost_row.get("Unit", "per meal")
+
     try:
         if unit == "per item":
             return amt * usage
+        if unit == "per meal":
+            return amt
         if unit == "per month":
-            meals_month = st.session_state.get("meals_this_month", 1)
-            return amt / meals_month
+            m = st.session_state.get("meals_this_month", 1)
+            return amt / m
         if unit == "per week":
-            meals_month = st.session_state.get("meals_this_month", 1)
-            return amt / (meals_month / 4)
+            m = st.session_state.get("meals_this_month", 1)
+            return amt / (m / 4)
         return amt / usage if usage else 0.0
-    except Exception:
+    except:
         return 0.0
 
 # ----------------------
@@ -101,51 +101,51 @@ def render():
     st.header("📊 Costing Dashboard")
     st.info("Overview of ingredient vs. business costs per meal and profitability.")
 
-    # Allocation settings
+    # — Allocation Settings —
     st.subheader("🧮 Allocation Settings")
-    meals_this_month = st.number_input(
-        "Meals produced this month", 
-        min_value=1, 
+    meals_month = st.number_input(
+        "Meals produced this month",
+        min_value=1,
         value=st.session_state.get("meals_this_month", 1000),
-        help="Enter total meals made this month to prorate monthly/weekly costs."
+        help="Total meals in the month for prorating monthly/weekly costs.",
     )
-    st.session_state["meals_this_month"] = meals_this_month
+    st.session_state["meals_this_month"] = meals_month
 
-    # Load data
+    # — Load Data —
     meals_df = load_meal_summary()
-    bc_df = load_business_costs()
+    bc_df    = load_business_costs()
 
-    # Compute business allocation per meal
+    # — Compute Overhead per Meal —
     if not bc_df.empty:
         bc_df["Cost per Meal"] = bc_df.apply(compute_business_per_meal, axis=1)
-        total_business = bc_df["Cost per Meal"].sum()
+        total_business         = bc_df["Cost per Meal"].sum()
     else:
         total_business = 0.0
 
-    # Assign overhead across meals
+    # — Assign & Recompute —
     meals_df["Business Cost"] = total_business
-    meals_df["Combined Cost"] = meals_df["Total Cost"] + meals_df["Business Cost"]
-    meals_df["Profit"] = meals_df["Sell Price"] - meals_df["Combined Cost"]
+    meals_df["Combined Cost"] = meals_df["Total Cost"] + total_business
+    meals_df["Profit"]        = meals_df["Sell Price"] - meals_df["Combined Cost"]
 
-    # Metrics cards
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Avg Ingredient Cost", f"${meals_df['Total Cost'].mean():.2f}")
-    col2.metric("Avg Business Cost", f"${meals_df['Business Cost'].mean():.2f}")
-    col3.metric("Avg Profit", f"${meals_df['Profit'].mean():.2f}")
+    # — Metrics Cards —
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Avg Ingredient Cost", f"${meals_df['Ingredients'].mean():.2f}")
+    c2.metric("Avg Business Cost",    f"${meals_df['Business Cost'].mean():.2f}")
+    c3.metric("Avg Profit",           f"${meals_df['Profit'].mean():.2f}")
 
-    # Detailed meal table
+    # — Detailed Table —
     st.subheader("Meal Cost Breakdown")
     st.dataframe(
-        meals_df[["Meal", "Total Cost", "Business Cost", "Combined Cost", "Sell Price", "Profit"]],
-        use_container_width=True
+        meals_df[["Meal", "Ingredients", "Business Cost", "Combined Cost", "Sell Price", "Profit"]],
+        use_container_width=True,
     )
 
-    # Show raw business costs
+    # — Business Costs Drill-down —
     st.subheader("Business Costs Allocation")
     if bc_df.empty:
         st.write("No business costs defined.")
     else:
         st.dataframe(
             bc_df[["Name", "Cost Type", "Amount", "Unit", "Usage Factor", "Cost per Meal"]],
-            use_container_width=True
+            use_container_width=True,
         )
