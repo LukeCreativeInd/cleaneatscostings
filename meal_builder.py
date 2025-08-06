@@ -138,16 +138,20 @@ def add_edit_callback(meal_name):
     new_i = st.session_state.get(key_i)
     new_q = st.session_state.get(key_q)
     new_u = st.session_state.get(key_u)
+    # Lookup ingredient row from ingredients DataFrame (Cost Per Unit column)
     row2 = ing_df[ing_df['Ingredient'] == new_i].iloc[0]
+    # Calculate base quantity and cost
     bq3 = display_to_base(new_q, new_u, row2['Unit Type'])
-    tot3 = round(bq3 * float(row2['Cost per Unit']), 6)
+    tot3 = round(bq3 * float(row2['Cost Per Unit']), 6)
+    # Build new ingredient entry matching meal_ingredients schema
     newrow = {
         'Ingredient': new_i,
         'Quantity': bq3,
-        'Cost Per Unit': float(row2['Cost Per Unit']),
+        'Cost per Unit': float(row2['Cost Per Unit']),
         'Total Cost': tot3,
         'Input Unit': new_u
     }
+    # Append to edit session state DataFrame
     st.session_state[f"edit_{meal_name}"] = pd.concat([df_edit, pd.DataFrame([newrow])], ignore_index=True)
 
 # Main UI
