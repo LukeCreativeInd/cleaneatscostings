@@ -109,7 +109,7 @@ def add_temp():
 
 # Callbacks
 
-def save_new_meal()():
+def save_new_meal():
     mdf = load_meals()
     temp = st.session_state["meal_ingredients"].copy()
     meal_name = st.session_state["meal_name"].strip()
