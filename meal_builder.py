@@ -189,16 +189,11 @@ def render():
         base = ing_df[ing_df["Ingredient"] == st.session_state["new_ing"]]
         uopts = get_display_unit_options(base.iloc[0]["Unit Type"]) if not base.empty else ["unit"]
         d3.selectbox("Unit", uopts, key="new_unit")
-        # Use callback so we can modify session_state safely before widgets are instantiated
+        # Add ingredient with callback
         d4.form_submit_button("➕ Add Ingredient", on_click=add_temp)
 
-        # Save meal
+        # Save meal with callback
         st.form_submit_button("💾 Save Meal", on_click=save_new_meal)
-        if st.form_submit_button("💾 Save Meal"):
-            if st.session_state["meal_ingredients"].empty:
-                st.warning("Add at least one ingredient.")
-            else:
-                save_new_meal()
 
     # Preview unsaved
     if not st.session_state["meal_ingredients"].empty:
