@@ -38,15 +38,19 @@ UNIT_OPTIONS = [
 # Data handling
 # ----------------------
 def load_business_costs():
+    """
+    Load business costs from CSV. If date columns exist, parse them.
+    """
     if os.path.exists(DATA_PATH):
-        df = pd.read_csv(
-            DATA_PATH,
-            parse_dates=["Effective From", "End Date"],
-            dayfirst=True,
-        )
+        df = pd.read_csv(DATA_PATH)
         # Standardize column names
         df.columns = [col.strip() for col in df.columns]
+        # Parse date columns if present
+        for date_col in ["Effective From", "End Date"]:
+            if date_col in df.columns:
+                df[date_col] = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
         return df
+    # Return empty with correct columns if no file
     return pd.DataFrame(
         columns=["Name", "Cost Type", "Amount", "Unit", "Effective From", "End Date"]
     )
