@@ -192,7 +192,6 @@ def render():
             if st.button(f"✏️ {mn}", key=key_btn):
                 st.session_state["editing_meal"] = mn
                 st.session_state[f"edit_{mn}"] = meals_df[meals_df['Meal']==mn].reset_index(drop=True)
-                st.experimental_rerun()
         else:
             df_edit = st.session_state[f"edit_{mn}"]
             exp = st.expander(f"Edit {mn}", expanded=True)
