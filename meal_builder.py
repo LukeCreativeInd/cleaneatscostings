@@ -214,7 +214,7 @@ def render():
         st.dataframe(df[["Ingredient","Display","Cost per Unit","Total Cost"]], use_container_width=True)
 
     st.markdown("---")
-    st.subheader("📦 Saved Meals (editing below)")
+    st.subheader("📦 Saved Meals")
     for mn in meals_df['Meal'].unique():
         if st.session_state['editing_meal'] != mn:
             st.button(f"✏️ {mn}", key=f"btn_{mn}", on_click=select_edit, args=(mn,))
@@ -268,8 +268,9 @@ def render():
                     out.to_csv(MEAL_DATA_PATH, index=False)
                     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
                     st.success(f"✅ Saved {df_final['Meal'].iloc[0]}")
-                    st.rerun()
+                    # Close edit expander and stay on Meals tab
                     st.session_state['editing_meal'] = None
+                    st.rerun()
 
 if __name__ == "__main__":
     render()
