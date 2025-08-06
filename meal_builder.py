@@ -121,6 +121,8 @@ def save_new_meal():
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
     st.success("✅ Meal saved!")
     st.session_state["meal_ingredients"] = pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"])
+    # Rerun to stay on the Meals tab after saving
+    st.experimental_rerun()
 
 # Edit callback
 
