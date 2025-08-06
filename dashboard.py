@@ -12,7 +12,7 @@ BUSINESS_COSTS_PATH = "data/business_costs.csv"
 # Data loaders
 # ----------------------
 def load_meal_summary():
-    """Generate the meal summary by aggregating meals.csv and applying stored overrides."""
+    """Generate the meal summary by aggregating data/meals.csv and applying stored overrides."""
     meals_path = "data/meals.csv"
 
     # 1) Aggregate raw ingredient costs
@@ -35,23 +35,48 @@ def load_meal_summary():
     else:
         stored = pd.DataFrame(columns=["Meal", "Other Costs", "Sell Price"])
 
-    # 3) Merge
-    summary = pd.merge(ing_totals, stored, on="Meal", how="outer")
+    # 3) Merge with suffixes to avoid column clashes
+    summary = pd.merge(
+        ing_totals,
+        stored,
+        on="Meal",
+        how="outer",
+        suffixes=("", "_stored")
+    )
 
-    # 4) Ensure and fill columns
-    for col, default in [("Ingredients", 0), ("Other Costs", 0)]:
-        if col not in summary.columns:
-            summary[col] = default
-        summary[col] = summary[col].fillna(default)
+    # 4) Ingredients priority: use actual totals if present, else fallback to stored
+    if "Ingredients" in summary.columns:
+        summary["Ingredients"] = summary["Ingredients"].fillna(0)
+    elif "Ingredients_stored" in summary.columns:
+        summary["Ingredients"] = summary["Ingredients_stored"].fillna(0)
+    else:
+        summary["Ingredients"] = 0
 
-    if "Sell Price" not in summary.columns:
+    # 5) Other Costs
+    if "Other Costs" in summary.columns:
+        summary["Other Costs"] = summary["Other Costs"].fillna(0)
+    elif "Other Costs_stored" in summary.columns:
+        summary["Other Costs"] = summary["Other Costs_stored"].fillna(0)
+    else:
+        summary["Other Costs"] = 0
+
+    # 6) Sell Price
+    if "Sell Price" in summary.columns:
+        summary["Sell Price"] = summary["Sell Price"].fillna(summary["Ingredients"])
+    elif "Sell Price_stored" in summary.columns:
+        summary["Sell Price"] = summary["Sell Price_stored"].fillna(summary["Ingredients"])
+    else:
         summary["Sell Price"] = summary["Ingredients"]
-    summary["Sell Price"] = summary["Sell Price"].fillna(summary["Ingredients"])
 
-    # 5) Compute total cost
+    # 7) Total Cost = Ingredients + Other Costs
     summary["Total Cost"] = summary["Ingredients"] + summary["Other Costs"]
-    return summary
 
+    # 8) Drop any suffixed columns
+    for col in list(summary.columns):
+        if col.endswith("_stored"):
+            summary.drop(columns=[col], inplace=True)
+
+    return summary
 
 def load_business_costs():
     """Load business costs ensuring key columns exist."""
@@ -73,18 +98,18 @@ def compute_business_per_meal(cost_row):
     usage = cost_row.get("Usage Factor",0) or 0
     unit  = cost_row.get("Unit","per meal")
     try:
-        if unit=="per item":
-            return amt*usage
-        if unit=="per meal":
+        if unit == "per item":
+            return amt * usage
+        if unit == "per meal":
             return amt
-        if unit=="per month":
+        if unit == "per month":
             m = st.session_state.get("meals_this_month",1)
-            return amt/m
-        if unit=="per week":
+            return amt / m
+        if unit == "per week":
             m = st.session_state.get("meals_this_month",1)
-            return amt/(m/4)
-        return amt/usage if usage else 0.0
-    except:
+            return amt / (m / 4)
+        return amt / usage if usage else 0.0
+    except Exception:
         return 0.0
 
 # ----------------------
@@ -109,7 +134,7 @@ def render():
 
     # Business cost per meal
     if not bc_df.empty:
-        bc_df["Cost per Meal"] = bc_df.apply(compute_business_per_meal,axis=1)
+        bc_df["Cost per Meal"] = bc_df.apply(compute_business_per_meal, axis=1)
         total_business = bc_df["Cost per Meal"].sum()
     else:
         total_business = 0.0
@@ -120,10 +145,10 @@ def render():
     meals_df["Profit"]        = meals_df["Sell Price"] - meals_df["Combined Cost"]
 
     # Metrics
-    c1,c2,c3 = st.columns(3)
-    c1.metric("Avg Ingredients",f"${meals_df['Ingredients'].mean():.2f}")
-    c2.metric("Avg Business", f"${meals_df['Business Cost'].mean():.2f}")
-    c3.metric("Avg Profit",   f"${meals_df['Profit'].mean():.2f}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Avg Ingredients", f"${meals_df['Ingredients'].mean():.2f}")
+    c2.metric("Avg Business",    f"${meals_df['Business Cost'].mean():.2f}")
+    c3.metric("Avg Profit",      f"${meals_df['Profit'].mean():.2f}")
 
     # Detail table
     st.subheader("Meal Cost Breakdown")
