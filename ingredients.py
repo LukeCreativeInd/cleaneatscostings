@@ -1,125 +1,104 @@
 import streamlit as st
 import pandas as pd
 import os
-import uuid
+import requests
 import base64
 import io
-import requests
-from utils import save_ingredients_to_github
 
-UNIT_TYPE_OPTIONS = ["KG", "L", "Unit"]
+# ----------------------
+# Config
+# ----------------------
 DATA_PATH = "data/ingredients.csv"
+GITHUB_PATH = "data/ingredients.csv"
 
+# ----------------------
+# Data handling
+# ----------------------
 def load_ingredients():
+    """
+    Load ingredients from GitHub if configured, else fallback to local file.
+    """
+    # If GitHub secrets missing, load from local CSV directly
+    token = st.secrets.get("github_token")
+    repo = st.secrets.get("github_repo")
+    if not token or not repo:
+        if os.path.exists(DATA_PATH):
+            return pd.read_csv(DATA_PATH)
+        return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost Per Unit"])
+    
+    # Attempt GitHub fetch
     try:
-        token = st.secrets["github_token"]
-        repo = st.secrets["github_repo"]
         branch = st.secrets.get("github_branch", "main")
-        path = "data/ingredients.csv"
-
-        api_url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}"
+        api_url = f"https://api.github.com/repos/{repo}/contents/{GITHUB_PATH}?ref={branch}"
         headers = {"Authorization": f"Bearer {token}"}
         resp = requests.get(api_url, headers=headers)
-
         if resp.status_code == 200:
             content = base64.b64decode(resp.json()["content"])
             df = pd.read_csv(io.StringIO(content.decode("utf-8")))
-
-            # Standardize columns
             df.columns = df.columns.str.strip().str.title()
-            expected_cols = ["Ingredient", "Unit Type", "Purchase Size", "Cost"]
-            df = df[[col for col in df.columns if col in expected_cols]]
-
-            os.makedirs("data", exist_ok=True)
+            # Standardize
+            df["Ingredient"] = df["Ingredient"].astype(str).str.strip().str.title()
+            df["Unit Type"] = df.get("Unit Type", "unit").astype(str).str.strip().str.upper()
+            df["Purchase Size"] = pd.to_numeric(df.get("Purchase Size", 0), errors="coerce").fillna(0)
+            df["Cost"] = pd.to_numeric(df.get("Cost", 0), errors="coerce").fillna(0)
+            df["Cost Per Unit"] = df["Cost"] / df["Purchase Size"].replace(0, 1)
+            # Save local copy
+            os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
             df.to_csv(DATA_PATH, index=False)
-
             return df
         else:
             st.warning(f"❌ GitHub API error {resp.status_code}: {resp.text}")
     except Exception as e:
         st.warning(f"⚠️ Exception loading ingredients: {e}")
 
-    return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
+    # Final fallback to local file
+    if os.path.exists(DATA_PATH):
+        return pd.read_csv(DATA_PATH)
+    return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost Per Unit"])
+
+# ----------------------
+# Main render
+# ----------------------
 
 def render():
-    st.header("📋 Ingredient Manager")
-    st.info("Use this tab to manage ingredients used in meals.\n\n**'Purchase Size'** is how much you buy at once (e.g. 5KG).\n**'Unit Type'** specifies if it's in kilograms, litres, or units.\n**'Cost'** is the total cost for the full purchase size.\n\nThe system calculates cost per unit automatically.")
+    st.header("📋 Ingredients")
+    st.info("Use this tab to manage ingredients used in meals.")
 
-    # Always load the latest data from GitHub on each render
-    ingredients_df = load_ingredients()
-    st.session_state.ingredients_df = ingredients_df
-    full_df = ingredients_df.copy()
+    df = load_ingredients()
 
-    def live_cost_per_unit(row):
-        try:
-            return round(float(row["Cost"]) / float(row["Purchase Size"]), 4)
-        except (ValueError, ZeroDivisionError, TypeError):
-            return None
-
-    saved_df = full_df.dropna(subset=["Ingredient"]).copy()
-    saved_df["Cost per Unit"] = saved_df.apply(live_cost_per_unit, axis=1)
-
-    st.subheader("🧾 Saved Ingredients")
-    if saved_df.empty:
-        st.warning("📄 No saved ingredients yet.")
+    # Display existing
+    st.subheader("Saved Ingredients")
+    if df.empty:
+        st.write("No saved ingredients yet.")
     else:
-        edited_saved_df = st.data_editor(
-            saved_df,
-            num_rows="dynamic",
-            use_container_width=True,
-            key="saved_ingredients"
-        )
+        edited = st.data_editor(df, num_rows="dynamic")
+        if st.button("💾 Save Ingredients"):
+            os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
+            edited.to_csv(DATA_PATH, index=False)
+            st.success("Ingredients updated successfully.")
 
-    st.divider()
-    st.subheader("➕ New Ingredient Entry")
-    if "new_entry_df" not in st.session_state:
-        st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
-
-    new_rows = st.session_state.new_entry_df.copy()
-
-    if "ingredient_form_key" not in st.session_state:
-        st.session_state.ingredient_form_key = str(uuid.uuid4())
-
-    form_container = st.empty()
-    with form_container.form(key=st.session_state.ingredient_form_key):
-        cols = st.columns([3, 2, 2, 2])
-        with cols[0]:
-            name = st.text_input("Ingredient Name", key="ingredient_name")
-        with cols[1]:
-            unit_type = st.selectbox("Unit Type", UNIT_TYPE_OPTIONS, key="ingredient_unit_type")
-        with cols[2]:
-            purchase_size = st.number_input("Purchase Size", min_value=0.0, step=0.1, key="ingredient_purchase_size")
-        with cols[3]:
-            cost = st.number_input("Cost", min_value=0.0, step=0.1, key="ingredient_cost")
-
-        add = st.form_submit_button("➕ Add Ingredient")
-        if add and name and purchase_size:
-            new_rows.loc[len(new_rows)] = {
-                "Ingredient": name,
-                "Unit Type": unit_type,
-                "Purchase Size": purchase_size,
-                "Cost": cost
-            }
-            st.session_state.new_entry_df = new_rows
-            for key in ["ingredient_name", "ingredient_unit_type", "ingredient_purchase_size", "ingredient_cost"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.session_state.ingredient_form_key = str(uuid.uuid4())
-            st.rerun()
-
-    if not new_rows.empty:
-        new_rows["Cost per Unit"] = new_rows.apply(live_cost_per_unit, axis=1)
-        st.dataframe(new_rows, use_container_width=True)
-
-    if st.button("💾 Save Ingredients"):
-        with st.spinner("Saving ingredients..."):
-            combined = pd.concat([saved_df, new_rows], ignore_index=True)
-            combined["Cost per Unit"] = combined.apply(live_cost_per_unit, axis=1)
-            st.session_state.ingredients_df = combined
-
-            save_ingredients_to_github(combined)
-
-            st.success("✅ Ingredients saved!")
-            st.session_state.new_entry_df = pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost"])
-            st.session_state.ingredient_form_key = str(uuid.uuid4())
-            st.rerun()
+    # Add new
+    st.subheader("New Ingredient Entry")
+    with st.form("add_ing_form"):
+        c1, c2, c3, c4 = st.columns(4)
+        name = c1.text_input("Ingredient Name")
+        unit = c2.selectbox("Unit Type", ["KG","L","Unit"])
+        size = c3.number_input("Purchase Size", min_value=0.0, step=0.1)
+        cost = c4.number_input("Cost", min_value=0.0, step=0.01)
+        submitted = st.form_submit_button("➕ Add Ingredient")
+        if submitted:
+            if not name.strip():
+                st.warning("Ingredient Name cannot be blank.")
+            else:
+                new = {
+                    "Ingredient": name.strip().title(),
+                    "Unit Type": unit,
+                    "Purchase Size": size,
+                    "Cost": cost,
+                    "Cost Per Unit": cost / size if size else 0,
+                }
+                df2 = pd.concat([df, pd.DataFrame([new])], ignore_index=True)
+                os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
+                df2.to_csv(DATA_PATH, index=False)
+                st.success(f"Added '{name.strip()}' successfully.")
+                st.rerun()
