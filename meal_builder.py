@@ -76,19 +76,15 @@ def commit_file_to_github(local_path, repo_path, msg):
     except:
         return
     url = f"https://api.github.com/repos/{repo}/contents/{repo_path}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json"
-    }
+    headers = {"Authorization": f"Bearer {token}",
+               "Accept": "application/vnd.github+json"}
     with open(local_path,"rb") as f:
         content = base64.b64encode(f.read()).decode()
     resp = requests.get(url,headers=headers,params={"ref":branch})
-    sha  = resp.json().get("sha") if resp.status_code == 200 else None
-    payload = {
-        "message": f"{msg} {datetime.utcnow().isoformat()}Z",
-        "content": content,
-        "branch": branch
-    }
+    sha  = resp.json().get("sha") if resp.status_code==200 else None
+    payload = {"message":f"{msg} {datetime.utcnow().isoformat()}Z",
+               "content":content,
+               "branch":branch}
     if sha:
         payload["sha"] = sha
     put = requests.put(url,headers=headers,json=payload)
@@ -120,7 +116,6 @@ def add_temp():
     # Clear just the ingredient & quantity—leave new_unit as-is
     st.session_state["new_ing"] = ""
     st.session_state["new_qty"] = 0.0
-    # <-- removed resetting new_unit so your last unit choice persists
 
 def save_new_meal():
     mdf  = load_meals()
@@ -133,7 +128,6 @@ def save_new_meal():
     out.to_csv(MEAL_DATA_PATH, index=False)
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
     st.success("✅ Meal saved!")
-    # reset for next
     st.session_state["meal_ingredients"] = pd.DataFrame(
         columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit"]
     )
@@ -161,7 +155,6 @@ def add_edit_callback(mn):
         [df_edit, pd.DataFrame([newrow])],
         ignore_index=True
     )
-    # bump form key so the edit-form clears
     st.session_state[f"edit_form_key_{mn}"] = str(uuid.uuid4())
 
 # Main UI
@@ -174,7 +167,13 @@ def render():
     ing_df   = load_ingredients()
     opts     = sorted(ing_df["Ingredient"].unique())
 
-    # Initialize state
+    # Seed new_unit so unit dropdown shows correct options from the start
+    if opts:
+        first_ut = ing_df.loc[ing_df["Ingredient"] == opts[0], "Unit Type"].iloc[0]
+    else:
+        first_ut = "unit"
+    st.session_state.setdefault("new_unit", get_display_unit_options(first_ut)[0])
+
     st.session_state.setdefault("meal_name","")
     st.session_state.setdefault("meal_sell_price",0.0)
     st.session_state.setdefault("meal_ingredients", pd.DataFrame(
@@ -193,10 +192,11 @@ def render():
         d1.selectbox("Ingredient", opts, key="new_ing")
         d2.number_input("Qty/Amt", min_value=0.0, step=0.1, key="new_qty")
         base = ing_df[ing_df["Ingredient"] == st.session_state["new_ing"]]
-        uopts = get_display_unit_options(base.iloc[0]["Unit Type"]) if not base.empty else ["unit"]
+        unit_type = base.iloc[0]["Unit Type"] if not base.empty else first_ut
+        uopts = get_display_unit_options(unit_type)
         d3.selectbox("Unit", uopts, key="new_unit")
         d4.form_submit_button("➕ Add Ingredient", on_click=add_temp)
-        c1.form_submit_button("💾 Save Meal", on_click=save_new_meal)
+        c1.form_submit_button("💾 Save Meal",     on_click=save_new_meal)
 
     # Preview unsaved
     if not st.session_state["meal_ingredients"].empty:
@@ -206,7 +206,8 @@ def render():
             lambda r: f"{base_to_display(r['Quantity'], r['Input Unit'])[0]:.2f} {r['Input Unit']}",
             axis=1
         )
-        st.dataframe(df[["Ingredient","Display","Cost Per Unit","Total Cost"]], use_container_width=True)
+        st.dataframe(df[["Ingredient","Display","Cost Per Unit","Total Cost"]],
+                     use_container_width=True)
 
     st.markdown("---")
     st.subheader("📦 Saved Meals")
@@ -235,11 +236,12 @@ def render():
                 nm = st.text_input("Meal Name", value=mn, key=f"rename_{mn}")
                 pr = st.number_input(
                     "Sell Price", min_value=0.0, step=0.01,
-                    value=float(meals_df.loc[meals_df["Meal"]==mn, "Sell Price"].iloc[0]),
+                    value=float(
+                        meals_df.loc[meals_df["Meal"]==mn, "Sell Price"].iloc[0]
+                    ),
                     key=f"sellprice_{mn}"
                 )
 
-                # Existing ingredients
                 st.markdown("### Ingredients")
                 for idx, r in df_edit.iterrows():
                     cols = st.columns([3,2,2,1,1])
@@ -250,18 +252,18 @@ def render():
                         key=f"qty_{mn}_{idx}"
                     )
 
-                    base_type = (
-                        ing_df.loc[ing_df["Ingredient"]==r["Ingredient"], "Unit Type"]
-                        .iloc[0]
-                    )
+                    base_type = ing_df.loc[
+                        ing_df["Ingredient"] == r["Ingredient"], "Unit Type"
+                    ].iloc[0]
                     unit_opts = get_display_unit_options(base_type)
-                    curr = r["Input Unit"]
-                    idx_opt = unit_opts.index(curr) if curr in unit_opts else 0
-                    us = cols[2].selectbox("Unit", unit_opts, index=idx_opt, key=f"unit_{mn}_{idx}")
+                    curr      = r["Input Unit"]
+                    idx_opt   = unit_opts.index(curr) if curr in unit_opts else 0
+                    us        = cols[2].selectbox("Unit", unit_opts, index=idx_opt,
+                                                  key=f"unit_{mn}_{idx}")
 
                     cpu_exist = r.get("Cost Per Unit") or 0.0
-                    bq2 = display_to_base(qty_val, us, base_type)
-                    tot2 = round(bq2 * float(cpu_exist), 6)
+                    bq2       = display_to_base(qty_val, us, base_type)
+                    tot2      = round(bq2 * float(cpu_exist), 6)
                     cols[3].write(f"Cost: ${tot2}")
 
                     if cols[4].button("Remove", key=f"rem_{mn}_{idx}"):
@@ -269,27 +271,31 @@ def render():
                         st.session_state[f"edit_{mn}"] = df_edit
                         st.rerun()
 
-                # Add Ingredient (edit mode)
                 st.markdown("### Add Ingredient")
                 with st.form(key=st.session_state[f"edit_form_key_{mn}"]):
                     a1, a2, a3 = st.columns([3,2,2])
                     a1.selectbox("Ingredient", opts, key=f"new_ing_edit_{mn}")
-                    a2.number_input("Qty", min_value=0.0, step=0.1, key=f"new_qty_edit_{mn}")
-                    base2 = ing_df[ing_df["Ingredient"]==st.session_state[f"new_ing_edit_{mn}"]]
-                    u2 = get_display_unit_options(base2.iloc[0]["Unit Type"]) if not base2.empty else ["unit"]
+                    a2.number_input("Qty", min_value=0.0, step=0.1,
+                                    key=f"new_qty_edit_{mn}")
+                    base2 = ing_df[ing_df["Ingredient"]==
+                                   st.session_state[f"new_ing_edit_{mn}"]]
+                    u2 = get_display_unit_options(base2.iloc[0]["Unit Type"]) \
+                         if not base2.empty else ["unit"]
                     a3.selectbox("Unit", u2, key=f"new_unit_edit_{mn}")
-                    st.form_submit_button("➕ Add Ingredient", on_click=add_edit_callback, args=(mn,))
+                    st.form_submit_button("➕ Add Ingredient",
+                                         on_click=add_edit_callback,
+                                         args=(mn,))
 
-                # Save edited meal
                 if st.button("💾 Save Changes", key=f"sv_{mn}"):
                     df_edit = st.session_state[f"edit_{mn}"]
                     df_edit["Meal"]       = nm.strip() or mn
                     df_edit["Sell Price"] = pr
                     others = meals_df[meals_df["Meal"] != mn]
-                    out = pd.concat([others, df_edit], ignore_index=True)
+                    out    = pd.concat([others, df_edit], ignore_index=True)
                     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
                     out.to_csv(MEAL_DATA_PATH, index=False)
-                    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
+                    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv",
+                                          "Save edited meal")
                     st.success(f"✅ Saved {df_edit['Meal'].iloc[0]}")
                     st.session_state["editing_meal"] = None
                     st.rerun()
