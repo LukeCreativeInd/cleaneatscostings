@@ -2,3 +2,5 @@ Meal,Ingredient,Quantity,Cost Per Unit,Total Cost,Cost per Unit,Input Unit,Sell 
 Chicken Pesto Pasta,Pasta - Penne,0.059,,0.15222,2.58,g,0.0
 Chicken Pesto Pasta,Rice - Basmati,0.13,,0.39,3.0,g,0.0
 Spaghetti Bol,Pasta - Spaghetti,0.12,,0.3096,2.58,g,12.0
+Meal Test,Baby Beans,0.02,,0.0971,4.855,g,12.0
+Meal Test,Black Beans,0.005,,0.02164,4.328,g,12.0
