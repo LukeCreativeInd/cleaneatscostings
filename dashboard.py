@@ -14,6 +14,7 @@ BUSINESS_COSTS_PATH = "data/business_costs.csv"
 def load_meal_summary():
     """Generate the meal summary from meals.csv and stored cost overrides."""
     meals_path = "data/meals.csv"
+    # 1) Ingredient totals from raw meals
     if os.path.exists(meals_path):
         mdf = pd.read_csv(meals_path)
         mdf.columns = [c.strip() for c in mdf.columns]
@@ -24,17 +25,32 @@ def load_meal_summary():
             .rename(columns={"Total Cost": "Ingredients"})
         )
     else:
-        ing_totals = pd.DataFrame(columns=["Meal", "Ingredients"])
+        ing_totals = pd.DataFrame({"Meal": [], "Ingredients": []})
 
+    # 2) Stored overrides
     if os.path.exists(MEAL_SUMMARY_PATH):
         stored = pd.read_csv(MEAL_SUMMARY_PATH)
         stored.columns = [c.strip() for c in stored.columns]
     else:
         stored = pd.DataFrame(columns=["Meal", "Other Costs", "Sell Price"])
 
+    # 3) Merge
     summary = pd.merge(ing_totals, stored, on="Meal", how="outer")
-    summary["Other Costs"] = summary.get("Other Costs", 0).fillna(0)
-    summary["Sell Price"] = summary.get("Sell Price", summary["Ingredients"]).fillna(0)
+
+    # 4) Ensure columns exist
+    if "Ingredients" not in summary:
+        summary["Ingredients"] = 0
+    if "Other Costs" not in summary:
+        summary["Other Costs"] = 0
+    if "Sell Price" not in summary:
+        summary["Sell Price"] = summary["Ingredients"]
+
+    # 5) Fill NaNs
+    summary["Ingredients"] = summary["Ingredients"].fillna(0)
+    summary["Other Costs"] = summary["Other Costs"].fillna(0)
+    summary["Sell Price"] = summary["Sell Price"].fillna(summary["Ingredients"])
+
+    # 6) Total Cost
     summary["Total Cost"] = summary["Ingredients"] + summary["Other Costs"]
     return summary
 
