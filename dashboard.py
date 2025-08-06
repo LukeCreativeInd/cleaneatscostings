@@ -162,3 +162,4 @@ def render():
             bc_df[["Name", "Cost Type", "Amount", "Unit", "Cost per Meal"]],
             use_container_width=True
         )
+ 
