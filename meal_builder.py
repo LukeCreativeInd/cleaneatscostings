@@ -160,6 +160,15 @@ def render():
     )
     st.session_state.setdefault("meal_form_key", str(uuid.uuid4()))
     st.session_state.setdefault("editing_meal", None)
+    # Clear new entry fields after an ingredient was added
+    if st.session_state.pop("just_added", False):
+        # reset to first ingredient option
+        opts = sorted(ing_df["Ingredient"].unique())
+        st.session_state["new_ing"] = opts[0] if opts else ""
+        st.session_state["new_qty"] = 0.0
+        base = ing_df[ing_df["Ingredient"] == st.session_state["new_ing"]]
+        uopts = get_display_unit_options(base.iloc[0]["Unit Type"]) if not base.empty else ["unit"]
+        st.session_state["new_unit"] = uopts[0] if uopts else "unit"
 
     # New meal form
     with st.form(key=st.session_state["meal_form_key"]):
