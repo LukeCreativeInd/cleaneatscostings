@@ -121,13 +121,6 @@ def render():
     st.info("Overview of ingredient vs. business costs per meal and profitability.")
 
     # Allocation input
-    st.subheader("🧮 Allocation Settings")
-    meals_month = st.number_input(
-        "Meals produced this month", min_value=1,
-        value=st.session_state.get("meals_this_month",1000),
-        help="Total meals this month for prorating periodic costs"
-    )
-    st.session_state["meals_this_month"] = meals_month
 
     # Load data
     meals_df = load_meal_summary()
