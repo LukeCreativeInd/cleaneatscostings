@@ -122,7 +122,7 @@ def save_new_meal():
     st.success("✅ Meal saved!")
     st.session_state["meal_ingredients"] = pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"])
     # Rerun to stay on the Meals tab after saving
-    st.experimental_rerun()
+    st.rerun()
 
 # Edit callback
 
