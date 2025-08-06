@@ -12,15 +12,11 @@ def display_to_base(qty, display_unit, base_unit_type):
     t = (base_unit_type or "").upper()
     u = (display_unit or "").lower()
     if t == "KG":
-        if u == "kg":
-            return qty * 1000
-        if u == "g":
-            return qty
+        if u == "kg": return qty * 1000
+        if u == "g": return qty
     if t == "L":
-        if u == "l":
-            return qty * 1000
-        if u == "ml":
-            return qty
+        if u == "l": return qty * 1000
+        if u == "ml": return qty
     return qty
 
 
@@ -28,24 +24,18 @@ def base_to_display(qty, base_unit_type, display_unit):
     t = (base_unit_type or "").upper()
     u = (display_unit or "").lower()
     if t == "KG":
-        if u == "kg":
-            return qty / 1000, "kg"
-        if u == "g":
-            return qty, "g"
+        if u == "kg": return qty / 1000, "kg"
+        if u == "g": return qty, "g"
     if t == "L":
-        if u == "l":
-            return qty / 1000, "L"
-        if u == "ml":
-            return qty, "ml"
+        if u == "l": return qty / 1000, "L"
+        if u == "ml": return qty, "ml"
     return qty, display_unit
 
 
 def get_display_unit_options(base_unit_type):
     t = (base_unit_type or "").upper()
-    if t == "KG":
-        return ["kg", "g"]
-    if t == "L":
-        return ["L", "ml"]
+    if t == "KG": return ["kg", "g"]
+    if t == "L": return ["L", "ml"]
     return ["unit"]
 
 # Data loaders
@@ -65,7 +55,7 @@ def load_ingredients():
 
 def render():
     st.header("🍽️ Meal Builder")
-    st.info("Build meals by adding ingredients & set a sell price; then save and edit meals.")
+    st.info("Build meals by adding ingredients & set a sell price; then save and edit existing meals.")
 
     meals_df = load_meals()
     ing_df = load_ingredients()
@@ -105,8 +95,11 @@ def render():
                     "Input Unit": new_u
                 }
                 df0 = st.session_state["meal_ingredients"]
-                df0 = pd.concat([df0, pd.DataFrame([newrow])], ignore_index=True)
-                st.session_state["meal_ingredients"] = df0
+                st.session_state["meal_ingredients"] = pd.concat([df0, pd.DataFrame([newrow])], ignore_index=True)
+                # reset fields
+                st.session_state["new_ing"] = opts[0]
+                st.session_state["new_qty"] = 0.0
+                st.session_state["new_unit"] = unit_opts[0]
 
     # Preview unsaved ingredients
     if not st.session_state["meal_ingredients"].empty:
@@ -127,6 +120,15 @@ def render():
         else:
             df_edit = st.session_state[f"edit_{mn}"]
             with st.expander(f"Edit Meal {mn}", expanded=True):
+                # Delete meal button
+                if st.button("🗑️ Delete Meal", key=f"del_{mn}"):
+                    remaining = meals_df[meals_df['Meal'] != mn]
+                    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
+                    remaining.to_csv(MEAL_DATA_PATH, index=False)
+                    st.success(f"Deleted meal {mn}")
+                    st.session_state['editing_meal'] = None
+                    return
+
                 nm = st.text_input("Meal Name", value=mn, key=f"rename_{mn}")
                 pr = st.number_input(
                     "Sell Price",
@@ -160,7 +162,6 @@ def render():
                     if cols[4].button("Remove", key=f"rem_{mn}_{idx}"):
                         df_edit = df_edit.drop(idx).reset_index(drop=True)
                         st.session_state[f"edit_{mn}"] = df_edit
-                        st.experimental_rerun()
 
                 st.markdown("### Add Ingredient")
                 a1, a2, a3, a4 = st.columns([3, 2, 2, 1])
@@ -180,11 +181,14 @@ def render():
                         "Total Cost": tot3,
                         "Input Unit": new_u
                     }
-                    df_edit = pd.concat([df_edit, pd.DataFrame([newrow])], ignore_index=True)
-                    st.session_state[f"edit_{mn}"] = df_edit
-                    st.experimental_rerun()
+                    st.session_state[f"edit_{mn}"] = pd.concat([df_edit, pd.DataFrame([newrow])], ignore_index=True)
+                    # reset fields
+                    st.session_state[f"new_ing_{mn}"] = opts[0]
+                    st.session_state[f"new_qty_{mn}"] = 0.0
+                    st.session_state[f"new_unit_{mn}"] = uops[0]
 
                 if st.button("💾 Save Changes", key=f"sv_{mn}"):
+                    df_edit = st.session_state[f"edit_{mn}"]
                     df_edit["Meal"] = nm.strip() or mn
                     df_edit["Sell Price"] = pr
                     others = meals_df[meals_df['Meal'] != mn]
@@ -192,8 +196,7 @@ def render():
                     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
                     out.to_csv(MEAL_DATA_PATH, index=False)
                     st.success(f"✅ Saved {df_edit['Meal'].iloc[0]}")
-                    del st.session_state[f"edit_{mn}"]
-                    st.session_state["editing_meal"] = None
+                    st.session_state['editing_meal'] = None
 
 if __name__ == "__main__":
     render()
