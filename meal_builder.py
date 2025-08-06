@@ -196,9 +196,19 @@ def render():
             df_edit = st.session_state[f"edit_{mn}"]
             exp = st.expander(f"Edit {mn}", expanded=True)
             with exp:
-                new_name = st.text_input("Meal Name", value=mn, key=f"rename_{mn}")
-                orig_price = df_edit['Sell Price'].iloc[0]
-                new_price = st.number_input("Sell Price", min_value=0.0, step=0.01, value=float(orig_price), key=f"sellprice_{mn}")
+                # Delete meal
+                if st.button("🗑️ Delete Meal", key=f"del_{mn}"):
+                    remaining = meals_df[meals_df['Meal'] != mn]
+                    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
+                    remaining.to_csv(MEAL_DATA_PATH, index=False)
+                    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Delete meal")
+                    st.success(f"Deleted {mn}")
+                    del st.session_state[f"edit_{mn}"]
+                    st.session_state["editing_meal"] = None
+                    return
+                # Add/Edit ingredients
+                st.markdown("### Ingredients")
+                # existing ingredients
                 for idx, r in df_edit.iterrows():
                     cols = st.columns([3,2,2,1,1])
                     cols[0].write(r['Ingredient'])
@@ -214,7 +224,25 @@ def render():
                         df_edit = df_edit.drop(idx).reset_index(drop=True)
                         st.session_state[f"edit_{mn}"] = df_edit
                         st.experimental_rerun()
-                if st.button("💾 Save Changes", key=f"sv_{mn}"):
+                # add new ingredient row
+                st.markdown("### Add Ingredient")
+                a1, a2, a3, a4 = st.columns([3,2,2,1])
+                new_ing = a1.selectbox("Ingredient", options, key=f"new_ing_{mn}")
+                new_qty = a2.number_input("Qty", min_value=0.0, step=0.1, key=f"new_qty_{mn}")
+                base = ingredients_df.loc[ingredients_df["Ingredient"]==new_ing]
+                unit_opts0 = get_display_unit_options(base.iloc[0]["Unit Type"]) if not base.empty else ["unit"]
+                new_unit = a3.selectbox("Unit", unit_opts0, key=f"new_unit_{mn}")
+                if a4.button("➕ Add", key=f"add_{mn}"):
+                    row = ingredients_df[ingredients_df["Ingredient"]==new_ing].iloc[0]
+                    bq2 = display_to_base(new_qty, new_unit, row["Unit Type"])
+                    cpu2 = float(row["Cost Per Unit"])
+                    tot2 = round(bq2*cpu2,6)
+                    new_entry = {"Ingredient": new_ing, "Quantity": bq2, "Cost per Unit": cpu2, "Total Cost": tot2, "Input Unit": new_unit}
+                    df_edit = pd.concat([df_edit, pd.DataFrame([new_entry])], ignore_index=True)
+                    st.session_state[f"edit_{mn}"] = df_edit
+                    st.experimental_rerun()
+                # save changes
+                if st.button("💾 Save Changes", key=f"sv_{mn}"):, key=f"sv_{mn}"):
                     final = st.session_state[f"edit_{mn}"]
                     final['Meal'] = st.session_state[f"rename_{mn}"].strip() or mn
                     final['Sell Price'] = st.session_state[f"sellprice_{mn}"]
