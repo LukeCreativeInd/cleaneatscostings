@@ -104,9 +104,12 @@ def add_temp():
     st.session_state["meal_ingredients"] = pd.concat([
         st.session_state["meal_ingredients"], pd.DataFrame([entry])
     ], ignore_index=True)
-    # Flag that an ingredient was just added
-    st.session_state["just_added"] = True
+    # Preserve meal details, reset form only
+    prev_name = st.session_state.get("meal_name", "")
+    prev_price = st.session_state.get("meal_sell_price", 0.0)
     st.session_state["meal_form_key"] = str(uuid.uuid4())
+    st.session_state["meal_name"] = prev_name
+    st.session_state["meal_sell_price"] = prev_price
 
 # Callbacks
 
@@ -161,6 +164,12 @@ def render():
     )
     st.session_state.setdefault("meal_form_key", str(uuid.uuid4()))
     st.session_state.setdefault("editing_meal", None)
+    # Default new-entry fields
+    st.session_state.setdefault("new_ing", opts[0] if opts else "")
+    st.session_state.setdefault("new_qty", 0.0)
+    default_base = ing_df[ing_df["Ingredient"] == st.session_state["new_ing"]]
+    default_unit_opts = get_display_unit_options(default_base.iloc[0]["Unit Type"]) if not default_base.empty else ["unit"]
+    st.session_state.setdefault("new_unit", default_unit_opts[0])
     # Clear new entry fields after an ingredient was added
     if st.session_state.pop("just_added", False):
         # reset to first ingredient option
