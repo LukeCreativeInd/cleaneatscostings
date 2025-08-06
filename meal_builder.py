@@ -196,8 +196,22 @@ def render():
             df_edit = st.session_state[f"edit_{mn}"]
             exp = st.expander(f"Edit {mn}", expanded=True)
             with exp:
+                # Rename & Sell Price
+                new_name = st.text_input("Meal Name", value=mn, key=f"rename_{mn}")
+                new_price = st.number_input("Sell Price", min_value=0.0, step=0.01, value=meals_df.loc[meals_df['Meal']==mn,'Sell Price'].iloc[0], key=f"sellprice_{mn}")
                 # Delete meal
                 if st.button("🗑️ Delete Meal", key=f"del_{mn}"):
+                    remaining = meals_df[meals_df['Meal'] != mn]
+                    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
+                    remaining.to_csv(MEAL_DATA_PATH, index=False)
+                    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Delete meal")
+                    st.success(f"Deleted {mn}")
+                    del st.session_state[f"edit_{mn}"]
+                    st.session_state["editing_meal"] = None
+                    return
+                # Add/Edit ingredients
+                st.markdown("### Ingredients")
+                # existing ingredients("🗑️ Delete Meal", key=f"del_{mn}"):
                     remaining = meals_df[meals_df['Meal'] != mn]
                     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
                     remaining.to_csv(MEAL_DATA_PATH, index=False)
