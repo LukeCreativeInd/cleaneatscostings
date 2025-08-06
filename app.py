@@ -12,9 +12,12 @@ import business_costs
 st.set_page_config(page_title="Clean Eats Costings", layout="wide")
 
 # --- SECRETS ---
-password = st.secrets.get("access_password")
+# Load access password once and cache in session_state to persist across reruns
+if "access_password" not in st.session_state:
+    st.session_state["access_password"] = st.secrets.get("access_password")
+password = st.session_state["access_password"]
 if password is None:
-    st.error("⚠️ Access password not configured in secrets['access_password'.]")
+    st.error("⚠️ Access password not configured in secrets['access_password'].")
     st.stop()
 
 # --- SESSION LOGIN STATE ---
