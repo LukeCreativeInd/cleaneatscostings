@@ -227,4 +227,3 @@ def render():
                     st.success(f"✅ Saved {final['Meal'].iloc[0]}")
                     del st.session_state[f"edit_{mn}"]
                     st.session_state["editing_meal"] = None
-                    st.experimental_rerun()
