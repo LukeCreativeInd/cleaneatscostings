@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import date
-from meal_builder import commit_file_to_github
 
 # ----------------------
 # Config
@@ -38,30 +36,26 @@ UNIT_OPTIONS = [
 # ----------------------
 # Data handling
 # ----------------------
+
 def load_business_costs():
     """
-    Load business costs from CSV if present; parse date columns if available.
+    Load business costs from CSV if present.
     """
     if os.path.exists(DATA_PATH):
         df = pd.read_csv(DATA_PATH)
-        # Standardize column names
         df.columns = [col.strip() for col in df.columns]
-        # Parse date columns
-        for date_col in ["Effective From", "End Date"]:
-            if date_col in df.columns:
-                df[date_col] = pd.to_datetime(df[date_col], dayfirst=True, errors='coerce')
         return df
     return pd.DataFrame(
-        columns=["Name", "Cost Type", "Amount", "Unit", "Effective From", "End Date"]
+        columns=["Name", "Cost Type", "Amount", "Unit", "Usage Factor"]
     )
 
 
 def save_business_costs(df: pd.DataFrame):
-    # Write locally
     os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
     df.to_csv(DATA_PATH, index=False)
     # Commit to GitHub if configured
     try:
+        from meal_builder import commit_file_to_github
         commit_file_to_github(DATA_PATH, "data/business_costs.csv", "Update business costs")
     except Exception as e:
         st.warning(f"⚠️ GitHub commit failed: {e}")
@@ -78,7 +72,7 @@ def render():
 
     # Add new cost form
     st.subheader("Add New Business Cost")
-    with st.form("add_cost_form"):  # clear_on_submit omitted to control rerun manually
+    with st.form("add_cost_form"):        
         c1, c2 = st.columns(2)
         name = c1.text_input("Cost Name")
         cost_type = c2.selectbox("Cost Type", COST_TYPE_OPTIONS)
@@ -87,9 +81,8 @@ def render():
         amount = c3.number_input("Amount", min_value=0.0, step=0.01)
         unit = c4.selectbox("Unit", UNIT_OPTIONS)
 
-        c5, c6 = st.columns(2)
-        eff_from = c5.date_input("Effective From", value=date.today())
-        end_date = c6.date_input("End Date (optional)", value=None)
+        usage = st.number_input("Usage Factor", min_value=0.0, step=0.01, help="Define how many units are used per meal or meals per cost unit.")
+        st.markdown("_Usage Factor: e.g. items per meal (for 'per item'), or meals per month (for 'per month')_")
 
         submitted = st.form_submit_button("➕ Add Cost")
         if submitted:
@@ -101,8 +94,7 @@ def render():
                     "Cost Type": cost_type,
                     "Amount": amount,
                     "Unit": unit,
-                    "Effective From": eff_from,
-                    "End Date": end_date or pd.NaT,
+                    "Usage Factor": usage,
                 }
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                 save_business_costs(df)
