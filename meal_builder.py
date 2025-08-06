@@ -179,7 +179,7 @@ def render():
     st.session_state.setdefault("new_unit", default_units[0])
     st.session_state.setdefault("editing_meal", None)
 
-    # New meal form remains unchanged...
+        # New meal form
     with st.form(key="meal_form"):
         c1, c2 = st.columns([3,2])
         c1.text_input("Meal Name", key="meal_name")
@@ -191,11 +191,20 @@ def render():
         base = ing_df[ing_df["Ingredient"] == st.session_state["new_ing"]]
         uopts = get_display_unit_options(base.iloc[0]["Unit Type"]) if not base.empty else ["unit"]
         d3.selectbox("Unit", uopts, key="new_unit")
-        # Add ingredient with callback
-        d4.form_submit_button("➕ Add Ingredient", on_click=add_temp)
+        if d4.form_submit_button("➕ Add Ingredient"):
+            if not st.session_state["meal_name"].strip():
+                st.warning("Enter a meal name first.")
+            elif st.session_state["new_qty"] <= 0:
+                st.warning("Quantity must be > 0.")
+            else:
+                add_temp()
 
-        # Save meal with callback
-        st.form_submit_button("💾 Save Meal", on_click=save_new_meal)
+        if st.form_submit_button("💾 Save Meal"):
+            if not st.session_state["meal_ingredients"].empty:
+                save_new_meal()
+                return
+            else:
+                st.warning("Add at least one ingredient.")
 
     # Preview unsaved
     if not st.session_state["meal_ingredients"].empty:
