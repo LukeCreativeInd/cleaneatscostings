@@ -104,7 +104,8 @@ def add_temp():
     st.session_state["meal_ingredients"] = pd.concat([
         st.session_state["meal_ingredients"], pd.DataFrame([entry])
     ], ignore_index=True)
-    # Reset form to clear fields
+    # Flag that an ingredient was just added
+    st.session_state["just_added"] = True
     st.session_state["meal_form_key"] = str(uuid.uuid4())
 
 # Callbacks
