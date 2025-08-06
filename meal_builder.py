@@ -124,10 +124,10 @@ def save_callback():
     combined.to_csv(MEAL_DATA_PATH, index=False)
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
     st.success("✅ Meal saved!")
+    # clear pending ingredients only
     st.session_state["meal_ingredients"] = pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"])
+    # keep meal_name and meal_sell_price for next meal
     st.session_state["meal_form_key"] = str(uuid.uuid4())
-    st.session_state["meal_name"] = ""
-    st.session_state["meal_sell_price"] = 0.0
     st.experimental_rerun()
 
 # ----------------------
