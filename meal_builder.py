@@ -100,18 +100,16 @@ def add_temp():
         "Total Cost": total,
         "Input Unit": st.session_state["new_unit"]
     }
+    # Append to temp
     st.session_state["meal_ingredients"] = pd.concat([
         st.session_state["meal_ingredients"], pd.DataFrame([entry])
     ], ignore_index=True)
-    # Clear fields for next add
-    opts = load_ingredients()
-    uopts = get_display_unit_options(row["Unit Type"])
-    st.session_state["new_ing"] = opts["Ingredient"].sort_values().iloc[0] if not opts.empty else ""
-    st.session_state["new_qty"] = 0.0
-    st.session_state["new_unit"] = uopts[0] if uopts else "unit"
+    # Reset form to clear fields
+    st.session_state["meal_form_key"] = str(uuid.uuid4())
 
+# Callbacks
 
-def save_new_meal():
+def save_new_meal()():
     mdf = load_meals()
     temp = st.session_state["meal_ingredients"].copy()
     meal_name = st.session_state["meal_name"].strip()
