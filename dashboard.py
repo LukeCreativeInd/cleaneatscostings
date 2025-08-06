@@ -27,14 +27,20 @@ def load_meal_summary():
                .rename(columns={"Total Cost": "Ingredients"})
         )
     else:
+        # empty totals + dummy mdf so downstream code still works
         ing_totals = pd.DataFrame({"Meal": [], "Ingredients": []})
         mdf = pd.DataFrame(columns=["Meal", "Sell Price"])
+
+    # **NEW**: coerce Meal keys to strings so merge never errors on empty tables
+    ing_totals["Meal"] = ing_totals["Meal"].astype(str)
+    mdf["Meal"]       = mdf["Meal"].astype(str)
 
     # 2) Pull latest sell price from meals.csv
     price_df = (
         mdf[["Meal", "Sell Price"]]
           .drop_duplicates(subset="Meal", keep="last")
     )
+    price_df["Meal"] = price_df["Meal"].astype(str)
 
     # 3) Merge ingredient totals with sell prices
     summary = ing_totals.merge(price_df, on="Meal", how="left")
@@ -93,7 +99,7 @@ def render():
     meals_month = st.number_input(
         "Meals produced this month",
         min_value=1,
-        value=st.session_state.get("meals_this_month", 6000),
+        value=st.session_state.get("meals_this_month", 1000),
         help="Total meals this month for prorating monthly costs"
     )
     st.session_state["meals_this_month"] = meals_month
