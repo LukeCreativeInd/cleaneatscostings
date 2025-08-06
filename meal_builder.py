@@ -128,7 +128,6 @@ def save_callback():
     st.session_state["meal_ingredients"] = pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"])
     # keep meal_name and meal_sell_price for next meal
     st.session_state["meal_form_key"] = str(uuid.uuid4())
-    st.experimental_rerun()
 
 # ----------------------
 # Main render
