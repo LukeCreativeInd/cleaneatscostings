@@ -94,6 +94,47 @@ def commit_file_to_github(local_path, repo_path, message_prefix):
     if put.status_code not in (200,201): st.error(f"GitHub commit failed: {put.status_code} {put.text}")
 
 # ----------------------
+# Callbacks
+# ----------------------
+def add_callback():
+    # Add selected ingredient to the pending meal list
+    ingredients_df = load_ingredients()
+    row = ingredients_df[ingredients_df["Ingredient"]==st.session_state.get("new_ing")].iloc[0]
+    qty = st.session_state.get("new_qty", 0.0)
+    bq = display_to_base(qty, st.session_state.get("new_unit"), row["Unit Type"])
+    cpu = float(row["Cost Per Unit"])
+    total = round(bq * cpu, 6)
+    entry = {
+        "Ingredient": row["Ingredient"],
+        "Quantity": bq,
+        "Cost per Unit": cpu,
+        "Total Cost": total,
+        "Input Unit": st.session_state.get("new_unit")
+    }
+    st.session_state["meal_ingredients"] = pd.concat([
+        st.session_state["meal_ingredients"],
+        pd.DataFrame([entry])
+    ], ignore_index=True)
+
+
+def save_callback():
+    # Persist the pending meal and its sell price to CSV (and GitHub)
+    meals_df = load_meals()
+    df_new = st.session_state.get("meal_ingredients", pd.DataFrame())
+    df_new["Meal"] = st.session_state.get("meal_name","").strip()
+    df_new["Sell Price"] = st.session_state.get("meal_sell_price", 0.0)
+    combined = pd.concat([meals_df, df_new], ignore_index=True)
+    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
+    combined.to_csv(MEAL_DATA_PATH, index=False)
+    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
+    st.success("✅ Meal saved!")
+    # Reset form state
+    st.session_state["meal_ingredients"] = pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"])
+    st.session_state["meal_form_key"] = str(uuid.uuid4())
+    st.session_state["meal_name"] = ""
+    st.session_state["meal_sell_price"] = 0.0
+
+# ----------------------
 # Core rendering
 # ----------------------
 def render():
