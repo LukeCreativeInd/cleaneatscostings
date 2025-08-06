@@ -22,28 +22,40 @@ def load_meal_summary():
 
 def load_business_costs():
     """Load business costs with Usage Factor."""
+    cols = ["Name", "Cost Type", "Amount", "Unit", "Usage Factor"]
     if os.path.exists(BUSINESS_COSTS_PATH):
         df = pd.read_csv(BUSINESS_COSTS_PATH)
         df.columns = [c.strip() for c in df.columns]
-        return df
-    return pd.DataFrame(columns=["Name", "Cost Type", "Amount", "Unit", "Usage Factor"])
+        for c in cols:
+            if c not in df.columns:
+                df[c] = 0 if c in ["Amount", "Usage Factor"] else ""
+        return df[cols]
+    return pd.DataFrame(columns=cols)
 
 # ----------------------
 # Calculations
 # ----------------------
 def compute_business_per_meal(cost_row):
     """
-    Compute per-meal allocation for a single business cost line.
-    - For "per item": cost_per_meal = Amount * Usage Factor
-    - Otherwise (per period): cost_per_meal = Amount / Usage Factor
+    Compute per-meal allocation for a single business cost line:
+    - "per item": cost_per_meal = Amount * Usage Factor
+    - "per month": cost_per_meal = Amount / meals_this_month
+    - "per week": cost_per_meal = Amount / (meals_this_month / 4)
+    - else: cost_per_meal = Amount / Usage Factor (if Usage Factor > 0)
     """
-    amt = cost_row.get("Amount", 0)
-    usage = cost_row.get("Usage Factor", 0)
+    amt = cost_row.get("Amount", 0) or 0
+    usage = cost_row.get("Usage Factor", 0) or 0
     unit = cost_row.get("Unit", "per meal")
     try:
         if unit == "per item":
             return amt * usage
-        # avoid division by zero
+        if unit == "per month":
+            meals_month = st.session_state.get("meals_this_month", 1)
+            return amt / meals_month
+        if unit == "per week":
+            meals_month = st.session_state.get("meals_this_month", 1)
+            # assume 4 weeks per month
+            return amt / (meals_month / 4)
         return amt / usage if usage else 0.0
     except Exception:
         return 0.0
@@ -54,6 +66,14 @@ def compute_business_per_meal(cost_row):
 def render():
     st.header("📊 Costing Dashboard")
     st.info("Overview of ingredient vs. business costs per meal and profitability.")
+
+    # Allocation settings
+    st.subheader("🧮 Allocation Settings")
+    meals_this_month = st.number_input(
+        "Meals produced this month", min_value=1, value=st.session_state.get("meals_this_month", 1000),
+        help="Enter the total meals made this month to prorate monthly/weekly costs."
+    )
+    st.session_state["meals_this_month"] = meals_this_month
 
     # Load data
     meals_df = load_meal_summary()
@@ -66,10 +86,10 @@ def render():
     else:
         total_business = 0.0
 
-    # Assign business cost per meal
+    # Assign business cost per meal to every meal
     meals_df["Business Cost"] = total_business
 
-    # Recalc totals and profit
+    # Recalculate combined cost & profit
     meals_df["Combined Cost"] = meals_df["Total Cost"] + meals_df["Business Cost"]
     meals_df["Profit"] = meals_df["Sell Price"] - meals_df["Combined Cost"]
 
@@ -79,16 +99,19 @@ def render():
     col2.metric("Avg Business Cost", f"${meals_df['Business Cost'].mean():.2f}")
     col3.metric("Avg Profit", f"${meals_df['Profit'].mean():.2f}")
 
-    # Display detailed table
+    # Detailed meal breakdown
     st.subheader("Meal Cost Breakdown")
     st.dataframe(
         meals_df[["Meal", "Total Cost", "Business Cost", "Combined Cost", "Sell Price", "Profit"]],
         use_container_width=True
     )
 
-    # Show raw business costs for reference
+    # Business costs allocation table
     st.subheader("Business Costs Allocation")
     if bc_df.empty:
         st.write("No business costs defined.")
     else:
-        st.dataframe(bc_df[["Name", "Cost Type", "Amount", "Unit", "Usage Factor", "Cost per Meal"]], use_container_width=True)
+        st.dataframe(
+            bc_df[["Name", "Cost Type", "Amount", "Unit", "Usage Factor", "Cost per Meal"]],
+            use_container_width=True
+        )
