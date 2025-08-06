@@ -128,9 +128,20 @@ def save_new_meal():
 # Edit callback
 
 def select_edit(meal_name):
+    # Initialize editing state and temp DataFrame
     meals_df = load_meals()
     st.session_state["editing_meal"] = meal_name
     st.session_state[f"edit_{meal_name}"] = meals_df[meals_df['Meal'] == meal_name].reset_index(drop=True)
+    # Initialize form fields for this meal
+    ing_df = load_ingredients()
+    opts_global = sorted(ing_df["Ingredient"].unique())
+    base_rows = ing_df[ing_df["Ingredient"] == opts_global[0]]
+    # default new ingredient selection
+    st.session_state.setdefault(f"new_ing_{meal_name}", opts_global[0])
+    st.session_state.setdefault(f"new_qty_{meal_name}", 0.0)
+    # determine unit options for default row
+    default_unit_opts = get_display_unit_options(base_rows.iloc[0]['Unit Type']) if not base_rows.empty else ['unit']
+    st.session_state.setdefault(f"new_unit_{meal_name}", default_unit_opts[0])
 
 # Main UI
 
