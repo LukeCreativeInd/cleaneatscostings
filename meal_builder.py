@@ -260,7 +260,7 @@ def render():
                     uu = a3.selectbox("Unit", unit_opts2, key=f"new_unit_edit_{mn}")
                     if st.form_submit_button("➕ Add Ingredient"):
                         add_edit_callback(mn)
-                        st.experimental_rerun()
+                        st.rerun()
                 # Save edited meal
                 if st.button("💾 Save Changes", key=f"sv_{mn}"):
                     df_final = st.session_state[f'edit_{mn}']
@@ -272,6 +272,7 @@ def render():
                     out.to_csv(MEAL_DATA_PATH, index=False)
                     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
                     st.success(f"✅ Saved {df_final['Meal'].iloc[0]}")
+                        st.rerun()
                     st.session_state['editing_meal'] = None
 
 if __name__ == "__main__":
