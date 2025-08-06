@@ -1,108 +1,164 @@
 import streamlit as st
 import pandas as pd
 import os
-import requests
-import base64
-import io
 
 # ----------------------
 # Config
 # ----------------------
-DATA_PATH = "data/ingredients.csv"
-GITHUB_PATH = "data/ingredients.csv"
+MEAL_SUMMARY_PATH   = "data/stored_total_summary.csv"
+BUSINESS_COSTS_PATH = "data/business_costs.csv"
 
 # ----------------------
-# Data handling
+# Data loaders
 # ----------------------
-def load_ingredients():
-    """
-    Load ingredients from GitHub if configured, else fallback to local file.
-    """
-    token = st.secrets.get("github_token")
-    repo = st.secrets.get("github_repo")
-    branch = st.secrets.get("github_branch", "main")
+def load_meal_summary():
+    """Generate the meal summary by aggregating data/meals.csv and applying stored overrides."""
+    meals_path = "data/meals.csv"
 
-    # If GitHub credentials present, attempt to fetch
-    if token and repo:
-        try:
-            api_url = f"https://api.github.com/repos/{repo}/contents/{GITHUB_PATH}?ref={branch}"
-            headers = {"Authorization": f"Bearer {token}"}
-            resp = requests.get(api_url, headers=headers)
-            if resp.status_code == 200:
-                content = base64.b64decode(resp.json()["content"])
-                df = pd.read_csv(io.StringIO(content.decode("utf-8")))
-                df.columns = df.columns.str.strip().str.title()
-                # Standardize
-                df["Ingredient"] = df["Ingredient"].astype(str).str.strip().str.title()
-                df["Unit Type"] = df.get("Unit Type", "Unit").astype(str).str.strip().str.upper()
-                df["Purchase Size"] = pd.to_numeric(df.get("Purchase Size", 0), errors="coerce").fillna(0)
-                df["Cost"] = pd.to_numeric(df.get("Cost", 0), errors="coerce").fillna(0)
-                df["Cost Per Unit"] = df["Cost"] / df["Purchase Size"].replace(0, 1)
-                # Save local copy
-                os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
-                df.to_csv(DATA_PATH, index=False)
-                return df
-            else:
-                st.warning(f"❌ GitHub API error {resp.status_code}")
-        except Exception as e:
-            st.warning(f"⚠️ Exception loading from GitHub: {e}")
+    # 1) Aggregate raw ingredient costs
+    if os.path.exists(meals_path):
+        mdf = pd.read_csv(meals_path)
+        mdf.columns = [c.strip() for c in mdf.columns]
+        ing_totals = (
+            mdf.groupby("Meal")["Total Cost"]
+               .sum()
+               .reset_index()
+               .rename(columns={"Total Cost": "Ingredients"})
+        )
+    else:
+        ing_totals = pd.DataFrame({"Meal": [], "Ingredients": []})
 
-    # Fallback to local file
-    if os.path.exists(DATA_PATH):
-        return pd.read_csv(DATA_PATH)
-    return pd.DataFrame(columns=["Ingredient", "Unit Type", "Purchase Size", "Cost", "Cost Per Unit"])
+    # 2) Load stored overrides
+    if os.path.exists(MEAL_SUMMARY_PATH):
+        stored = pd.read_csv(MEAL_SUMMARY_PATH)
+        stored.columns = [c.strip() for c in stored.columns]
+    else:
+        stored = pd.DataFrame(columns=["Meal", "Other Costs", "Sell Price"])
+
+    # 3) Merge with suffixes
+    summary = pd.merge(
+        ing_totals,
+        stored,
+        on="Meal",
+        how="outer",
+        suffixes=("", "_stored")
+    )
+
+    # 4) Ensure Ingredients
+    if "Ingredients" in summary.columns:
+        summary["Ingredients"] = summary["Ingredients"].fillna(0)
+    elif "Ingredients_stored" in summary.columns:
+        summary["Ingredients"] = summary["Ingredients_stored"].fillna(0)
+    else:
+        summary["Ingredients"] = 0
+
+    # 5) Ensure Other Costs
+    if "Other Costs" in summary.columns:
+        summary["Other Costs"] = summary["Other Costs"].fillna(0)
+    elif "Other Costs_stored" in summary.columns:
+        summary["Other Costs"] = summary["Other Costs_stored"].fillna(0)
+    else:
+        summary["Other Costs"] = 0
+
+    # 6) Ensure Sell Price
+    if "Sell Price" in summary.columns:
+        summary["Sell Price"] = summary["Sell Price"].fillna(summary["Ingredients"])
+    elif "Sell Price_stored" in summary.columns:
+        summary["Sell Price"] = summary["Sell Price_stored"].fillna(summary["Ingredients"])
+    else:
+        summary["Sell Price"] = summary["Ingredients"]
+
+    # 7) Compute Total Cost
+    summary["Total Cost"] = summary["Ingredients"] + summary["Other Costs"]
+
+    # 8) Drop suffixed columns
+    for col in list(summary.columns):
+        if col.endswith("_stored"):
+            summary.drop(columns=[col], inplace=True)
+
+    return summary
 
 
-def save_ingredients(df: pd.DataFrame):
-    os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
-    df.to_csv(DATA_PATH, index=False)
-    # Attempt GitHub commit if available
-    try:
-        from meal_builder import commit_file_to_github
-        commit_file_to_github(DATA_PATH, GITHUB_PATH, "Update ingredients.csv")
-    except Exception as e:
-        st.warning(f"⚠️ GitHub commit failed: {e}")
+def load_business_costs():
+    """Load business costs ensuring key columns exist."""
+    cols = ["Name", "Cost Type", "Amount", "Unit"]
+    if os.path.exists(BUSINESS_COSTS_PATH):
+        df = pd.read_csv(BUSINESS_COSTS_PATH)
+        df.columns = [c.strip() for c in df.columns]
+        for c in cols:
+            if c not in df.columns:
+                df[c] = 0.0 if c == "Amount" else ""
+        return df[cols]
+    return pd.DataFrame(columns=cols)
+
+# ----------------------
+# Calculations
+# ----------------------
+def compute_business_per_meal(cost_row):
+    amt  = cost_row.get("Amount", 0) or 0
+    unit = cost_row.get("Unit", "per meal")
+    meals_month = st.session_state.get("meals_this_month", 1)
+
+    if unit == "per meal":
+        return amt
+    if unit == "per carton":
+        return amt / 24
+    if unit == "per month":
+        return amt / meals_month
+    return 0.0
 
 # ----------------------
 # Main render
 # ----------------------
-
 def render():
-    st.header("📋 Ingredients")
-    st.info("Use this tab to manage ingredients used in meals.")
+    st.header("📊 Costing Dashboard")
+    st.info("Overview of ingredient vs. business costs per meal and profitability.")
 
-    # New Ingredient Form
-    st.subheader("New Ingredient Entry")
-    with st.form("add_ing_form", clear_on_submit=True):
-        c1, c2, c3, c4 = st.columns(4)
-        name = c1.text_input("Ingredient Name")
-        unit = c2.selectbox("Unit Type", ["KG", "L", "Unit"])
-        size = c3.number_input("Purchase Size", min_value=0.0, step=0.1)
-        cost = c4.number_input("Cost", min_value=0.0, step=0.01)
-        submitted = st.form_submit_button("➕ Add Ingredient")
-        if submitted:
-            if not name.strip():
-                st.warning("Ingredient Name cannot be blank.")
-            else:
-                df_all = load_ingredients()
-                new_row = {
-                    "Ingredient": name.strip().title(),
-                    "Unit Type": unit,
-                    "Purchase Size": size,
-                    "Cost": cost,
-                    "Cost Per Unit": cost / size if size else 0,
-                }
-                df_all = pd.concat([df_all, pd.DataFrame([new_row])], ignore_index=True)
-                save_ingredients(df_all)
-                st.success(f"Added '{name.strip()}' successfully.")
+    # Allocation settings
+    st.subheader("🧮 Allocation Settings")
+    meals_month = st.number_input(
+        "Meals produced this month",
+        min_value=1,
+        value=st.session_state.get("meals_this_month", 1000),
+        help="Total meals this month for prorating monthly costs"
+    )
+    st.session_state["meals_this_month"] = meals_month
 
-    # Existing Ingredients
-    df = load_ingredients()
-    st.subheader("Saved Ingredients")
-    if df.empty:
-        st.write("No saved ingredients yet.")
+    # Load data
+    meals_df = load_meal_summary()
+    bc_df    = load_business_costs()
+
+    # Compute business cost per meal
+    if not bc_df.empty:
+        bc_df["Cost per Meal"] = bc_df.apply(compute_business_per_meal, axis=1)
+        total_business = bc_df["Cost per Meal"].sum()
     else:
-        edited = st.data_editor(df, num_rows="dynamic")
-        if st.button("💾 Save Ingredients", key="save_ings"):
-            save_ingredients(edited)
-            st.success("Ingredients updated successfully.")
+        total_business = 0.0
+
+    # Merge into meals_df
+    meals_df["Business Cost"] = total_business
+    meals_df["Combined Cost"] = meals_df["Total Cost"] + total_business
+    meals_df["Profit"]        = meals_df["Sell Price"] - meals_df["Combined Cost"]
+
+    # Metrics
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Avg Ingredients", f"${meals_df['Ingredients'].mean():.2f}")
+    c2.metric("Avg Business",    f"${meals_df['Business Cost'].mean():.2f}")
+    c3.metric("Avg Profit",      f"${meals_df['Profit'].mean():.2f}")
+
+    # Meal Cost Breakdown table
+    st.subheader("Meal Cost Breakdown")
+    st.dataframe(
+        meals_df[["Meal", "Ingredients", "Business Cost", "Combined Cost", "Sell Price", "Profit"]],
+        use_container_width=True
+    )
+
+    # Business Costs Allocation table
+    st.subheader("Business Costs Allocation")
+    if bc_df.empty:
+        st.write("No business costs defined.")
+    else:
+        st.dataframe(
+            bc_df[["Name", "Cost Type", "Amount", "Unit", "Cost per Meal"]],
+            use_container_width=True
+        )
