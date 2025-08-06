@@ -140,28 +140,6 @@ def render():
     meals_df["Combined Cost"] = meals_df["Total Cost"] + total_business
     meals_df["Profit"]        = meals_df["Sell Price"] - meals_df["Combined Cost"]
 
-    # ✏️ Edit Sell Price Overrides
-    st.subheader("✏️ Edit Sell Price")
-    overrides = meals_df[["Meal", "Sell Price"]].copy()
-    edited = st.data_editor(
-        overrides,
-        num_rows="fixed",
-        column_config={
-            "Meal": st.column_config.TextColumn("Meal", disabled=True),
-            "Sell Price": st.column_config.NumberColumn("Sell Price", min_value=0.0, format="%.2f"),
-        }
-    )
-    if st.button("💾 Save Sell Prices"):
-        # write back overrides
-        to_save = edited.rename(columns={"Sell Price": "Sell Price"})
-        to_save.to_csv(MEAL_SUMMARY_PATH, index=False)
-        try:
-            from meal_builder import commit_file_to_github
-            commit_file_to_github(MEAL_SUMMARY_PATH, MEAL_SUMMARY_PATH, "Update sell price overrides")
-        except Exception as e:
-            st.warning(f"⚠️ GitHub commit failed: {e}")
-        st.success("Sell prices saved.")
-
     # Metrics
     c1, c2, c3 = st.columns(3)
     c1.metric("Avg Ingredients", f"${meals_df['Ingredients'].mean():.2f}")
