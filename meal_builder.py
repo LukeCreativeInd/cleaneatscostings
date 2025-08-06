@@ -131,8 +131,8 @@ def save_callback():
     # Reset form state
     st.session_state["meal_ingredients"] = pd.DataFrame(columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"])
     st.session_state["meal_form_key"] = str(uuid.uuid4())
-    st.session_state["meal_name"] = ""
-    st.session_state["meal_sell_price"] = 0.0
+    # st.session_state["meal_name"] = ""  # cleared on submit
+    # st.session_state["meal_sell_price"] = 0.0  # cleared on submit
 
 # ----------------------
 # Core rendering
@@ -157,7 +157,7 @@ def render():
     st.session_state.setdefault("editing_meal", None)
 
     # form for creating a new meal
-    with st.form(key=st.session_state["meal_form_key"]):
+    with st.form(key=st.session_state["meal_form_key"], clear_on_submit=True):
         # first row: Meal Name & Sell Price
         r1c1, r1c2 = st.columns([3,2])
         r1c1.text_input("Meal Name", key="meal_name")
