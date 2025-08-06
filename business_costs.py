@@ -106,7 +106,7 @@ def render():
     if df.empty:
         st.write("No business costs recorded yet.")
     else:
-        edited = st.experimental_data_editor(df, num_rows="dynamic")
+        edited = st.data_editor(df, num_rows="dynamic")
         if st.button("💾 Save Changes", key="save_business_costs"):
             save_business_costs(edited)
             st.success("Business costs updated successfully.")
