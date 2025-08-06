@@ -37,6 +37,8 @@ UNIT_OPTIONS = [
 # ----------------------
 # Data handling
 # ----------------------
+from meal_builder import commit_file_to_github  # for GitHub commits
+
 def load_business_costs():
     """
     Load business costs from CSV if present; parse date columns if available.
@@ -54,8 +56,14 @@ def load_business_costs():
         columns=["Name", "Cost Type", "Amount", "Unit", "Effective From", "End Date"]
     )
 
-
 def save_business_costs(df: pd.DataFrame):
+    os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
+    df.to_csv(DATA_PATH, index=False)
+    # Commit to GitHub
+    try:
+        commit_file_to_github(DATA_PATH, "data/business_costs.csv", "Update business costs")
+    except Exception as e:
+        st.warning(f"⚠️ GitHub commit failed: {e}")(df: pd.DataFrame):
     os.makedirs(os.path.dirname(DATA_PATH), exist_ok=True)
     df.to_csv(DATA_PATH, index=False)
 
