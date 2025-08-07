@@ -43,7 +43,7 @@ def load_meals():
         if "Sell Price" not in df.columns:
             df["Sell Price"] = 0.0
         return df
-    return pd.DataFrame(columns=["Meal","Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit","Sell Price"])
+    return pd.DataFrame(columns=["Meal","Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit","Sell Price"])
 
 def load_ingredients():
     if os.path.exists(INGREDIENTS_PATH):
@@ -94,7 +94,7 @@ def add_temp():
     entry = {
         "Ingredient":    sel,
         "Quantity":      base_q,
-        "Cost per Unit": cpu,
+        "Cost Per Unit": cpu,
         "Total Cost":    total,
         "Input Unit":    st.session_state["new_unit"]
     }
@@ -117,7 +117,7 @@ def save_new_meal():
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
     st.success("✅ Meal saved!")
     st.session_state["meal_ingredients"] = pd.DataFrame(
-        columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"]
+        columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit"]
     )
     st.session_state["meal_form_key"] = str(uuid.uuid4())
 
@@ -177,7 +177,7 @@ def render():
     st.session_state.setdefault("meal_name","")
     st.session_state.setdefault("meal_sell_price",0.0)
     st.session_state.setdefault("meal_ingredients", pd.DataFrame(
-        columns=["Ingredient","Quantity","Cost per Unit","Total Cost","Input Unit"]
+        columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit"]
     ))
     st.session_state.setdefault("meal_form_key", str(uuid.uuid4()))
     st.session_state.setdefault("editing_meal", None)
@@ -207,7 +207,7 @@ def render():
             lambda r: f"{base_to_display(r['Quantity'], r['Input Unit'])[0]:.2f} {r['Input Unit']}",
             axis=1
         )
-        st.dataframe(df[["Ingredient","Display","Cost per Unit","Total Cost"]], use_container_width=True)
+        st.dataframe(df[["Ingredient","Display","Cost Per Unit","Total Cost"]], use_container_width=True)
 
     st.markdown("---")
     st.subheader("📦 Saved Meals")
@@ -249,7 +249,7 @@ def render():
                                       index=unit_opts.index(r["Input Unit"]),
                                       key=f"unit_{mn}_{idx}")
                     bq2   = display_to_base(qty_val, r["Input Unit"], base_type)
-                    tot2  = round(bq2 * float(r["Cost per Unit"]), 6)
+                    tot2  = round(bq2 * float(r["Cost Per Unit"]), 6)
                     cols[3].write(f"Cost: ${tot2}")
                     if cols[4].button("Remove", key=f"rem_{mn}_{idx}"):
                         df2 = df_edit.drop(idx).reset_index(drop=True)
