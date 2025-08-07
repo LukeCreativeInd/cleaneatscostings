@@ -1,7 +1,9 @@
-Meal,Ingredient,Quantity,Cost Per Unit,Total Cost,Input Unit,Sell Price
-Butter Chicken,Breast Fillet (No Skin No Marinate),0.13,8.1,1.053,g,12.0
-Butter Chicken,Green Peas,0.04,4.45,0.178,g,12.0
-Butter Chicken,Rice - Basmati,0.13,3.0,0.39,g,12.0
-Chicken Pesto Pasta,Breast Fillet (No Skin No Marinate),0.13,8.1,1.053,g,12.0
-Chicken Pesto Pasta,Pasta - Penne,0.059,2.58,0.15222,g,12.0
-Test,Baby Beans,0.006,4.855,0.02913,g,12.0
+Meal,Ingredient,Quantity,Cost Per Unit,Total Cost,Input Unit,Sell Price,Cost per Unit
+Butter Chicken,Breast Fillet (No Skin No Marinate),0.13,8.1,1.053,g,12.0,
+Butter Chicken,Green Peas,0.04,4.45,0.178,g,12.0,
+Butter Chicken,Rice - Basmati,0.13,3.0,0.39,g,12.0,
+Chicken Pesto Pasta,Breast Fillet (No Skin No Marinate),0.13,8.1,1.053,g,12.0,
+Chicken Pesto Pasta,Pasta - Penne,0.059,2.58,0.15222,g,12.0,
+Test,Baby Beans,0.006,4.855,0.02913,g,12.0,
+Test 2,Baby Beans,0.06,,0.2913,g,12.0,4.855
+Test 2,Black Beans,0.06,,0.25968,g,12.0,4.328
