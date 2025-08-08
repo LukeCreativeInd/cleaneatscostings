@@ -169,7 +169,7 @@ def _sync_edit_from_widgets(mn: str):
 # Edit-meal callbacks
 
 def add_edit_callback(mn):
-    # ✅ ensure any inline edits are captured before we append & rerun
+    # ✅ ensure any inline edits are captured before we append
     _sync_edit_from_widgets(mn)
 
     df_edit = st.session_state[f"edit_{mn}"]
@@ -192,8 +192,9 @@ def add_edit_callback(mn):
         [df_edit, pd.DataFrame([newrow])],
         ignore_index=True
     )
-    st.session_state[f"edit_form_key_{mn}"] = str(uuid.uuid4())
-    st.rerun()
+    # clear add inputs for next run
+    st.session_state[f"new_qty_edit_{mn}"] = 0.0
+    # NOTE: no st.rerun() here — the button click already triggers a rerun
 
 def save_edit_meal(mn):
     # ✅ capture any pending inline edits right before persist
@@ -366,20 +367,20 @@ def render():
                     st.rerun()
 
             st.markdown("### Add Ingredient")
-            with st.form(key=st.session_state[f"edit_form_key_{active}"]):
-                a1, a2, a3 = st.columns([3, 2, 2])
-                a1.selectbox("Ingredient", opts, key=f"new_ing_edit_{active}")
-                a2.number_input("Qty", min_value=0.0, step=0.1, key=f"new_qty_edit_{active}")
-                b2 = load_ingredients()[load_ingredients()["Ingredient"] == st.session_state[f"new_ing_edit_{active}"]]
-                u2 = get_display_unit_options(b2.iloc[0]["Unit Type"]) if not b2.empty else ["unit"]
-                a3.selectbox("Unit", u2, key=f"new_unit_edit_{active}")
-                if st.form_submit_button("➕ Add Ingredient"):
-                    if not st.session_state[f"new_ing_edit_{active}"]:
-                        st.warning("Select an ingredient.")
-                    elif st.session_state[f"new_qty_edit_{active}"] <= 0:
-                        st.warning("Quantity must be > 0.")
-                    else:
-                        add_edit_callback(active)
+            # (Switched from form to regular widgets + button to avoid rerun races)
+            a1, a2, a3, a4 = st.columns([3, 2, 2, 1])
+            a1.selectbox("Ingredient", opts, key=f"new_ing_edit_{active}")
+            a2.number_input("Qty", min_value=0.0, step=0.1, key=f"new_qty_edit_{active}")
+            b2 = load_ingredients()[load_ingredients()["Ingredient"] == st.session_state[f"new_ing_edit_{active}"]]
+            u2 = get_display_unit_options(b2.iloc[0]["Unit Type"]) if not b2.empty else ["unit"]
+            a3.selectbox("Unit", u2, key=f"new_unit_edit_{active}")
+            if a4.button("➕ Add Ingredient", key=f"add_ing_btn_{active}"):
+                if not st.session_state[f"new_ing_edit_{active}"]:
+                    st.warning("Select an ingredient.")
+                elif st.session_state[f"new_qty_edit_{active}"] <= 0:
+                    st.warning("Quantity must be > 0.")
+                else:
+                    add_edit_callback(active)  # append; no explicit rerun here
 
             if st.button("💾 Save Changes", key=f"sv_{active}"):
                 save_edit_meal(active)
