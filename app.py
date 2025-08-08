@@ -42,13 +42,70 @@ if not st.session_state.logged_in:
 st.title("📊 Clean Eats Meal Costings")
 st.markdown("Use the tabs to view and manage ingredients, meals, business costs, and cost breakdowns.")
 
-# --- PAGE NAVIGATION via built-in tabs ---
-tab_dashboard, tab_ingredients, tab_meals, tab_business = st.tabs([
-    "💰 Costing Dashboard",
-    "📋 Ingredients",
-    "🍽️ Meals",
-    "⚙️ Business Costs",
-])
+# -----------------------------
+# Faux tabs (radio) with sticky selection
+# -----------------------------
+# CSS to style the horizontal radio like tabs
+st.markdown(
+    """
+    <style>
+    /* Container for our faux tabs */
+    #tabbar [role="radiogroup"] {
+        display: flex;
+        gap: 0;
+        border-bottom: 1px solid rgba(49,51,63,0.2);
+        margin-bottom: 0.75rem;
+        padding-bottom: 0;
+    }
+    /* Each option wrapper */
+    #tabbar [role="radiogroup"] > label {
+        padding: 0;
+        margin: 0 6px 0 0;
+        background: transparent;
+        border: 0;
+    }
+    /* Hide the default radio dot/icon */
+    #tabbar [role="radiogroup"] svg { display: none; }
+
+    /* The clickable "tab" surface */
+    #tabbar [role="radiogroup"] > label > div[role="radio"] {
+        border: 1px solid rgba(49,51,63,0.15);
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
+        background: #f7f8fa;
+        padding: 8px 14px;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease;
+        white-space: nowrap;
+    }
+    /* Selected tab */
+    #tabbar [role="radiogroup"] > label > div[role="radio"][aria-checked="true"] {
+        background: var(--background-color);
+        border-color: rgba(49,51,63,0.3);
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Persisted nav labels (match your old tab titles)
+NAV_LABELS = ["💰 Costing Dashboard", "📋 Ingredients", "🍽️ Meals", "⚙️ Business Costs"]
+st.session_state.setdefault("active_tab", "💰 Costing Dashboard")
+
+st.markdown('<div id="tabbar">', unsafe_allow_html=True)
+choice = st.radio(
+    "Navigation",
+    NAV_LABELS,
+    horizontal=True,
+    label_visibility="hidden",
+    index=NAV_LABELS.index(st.session_state["active_tab"]),
+    key="tab_selector",
+)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Persist selection so reruns keep you on the same tab
+st.session_state["active_tab"] = choice
 
 # --- SESSION DATA LOAD ---
 DATA_FILE = "data/stored_total_summary.csv"
@@ -68,12 +125,12 @@ if "business_costs_df" not in st.session_state:
         columns=["Name", "Type", "Amount", "Unit"]
     )
 
-# --- RENDER PAGES ---
-with tab_dashboard:
+# --- RENDER PAGES (one at a time) ---
+if choice == "💰 Costing Dashboard":
     dashboard.render()
-with tab_ingredients:
+elif choice == "📋 Ingredients":
     ingredients.render()
-with tab_meals:
+elif choice == "🍽️ Meals":
     meal_builder.render()
-with tab_business:
+else:  # "⚙️ Business Costs"
     business_costs.render()
