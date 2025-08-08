@@ -118,7 +118,7 @@ def add_temp():
         [st.session_state["meal_ingredients"], pd.DataFrame([entry])],
         ignore_index=True
     )
-    # Clear on the next run (avoid mutating widget keys in the same cycle)
+    # Clear next run
     st.session_state["__clear_add_fields__"] = True
 
 def save_new_meal():
@@ -131,13 +131,14 @@ def save_new_meal():
     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
     out.to_csv(MEAL_DATA_PATH, index=False)
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
-    # message and refresh flag
+
+    # message + refresh list + reset draft
     st.session_state["__last_meal_save_msg__"] = "✅ Meal saved!"
+    st.session_state["__meals_saved__"] = True
     st.session_state["meal_ingredients"] = pd.DataFrame(
         columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit","Unit Type"]
     )
     st.session_state["meal_form_key"] = str(uuid.uuid4())
-    st.session_state["__meals_saved__"] = True
 
 # Edit-meal callbacks
 
@@ -167,7 +168,7 @@ def add_edit_callback(mn):
 def save_edit_meal(mn):
     df_edit = st.session_state[f"edit_{mn}"]
 
-    # Read latest widget values for each row and update df_edit
+    # Read latest widget values
     for idx, r in df_edit.iterrows():
         qty_display = st.session_state.get(
             f"qty_{mn}_{idx}",
@@ -184,7 +185,7 @@ def save_edit_meal(mn):
     df_edit["Meal"]       = nm
     df_edit["Sell Price"] = pr
 
-    # Persist to CSV
+    # Persist
     all_meals = load_meals()
     others    = all_meals[all_meals["Meal"] != mn]
     out       = pd.concat([others, df_edit], ignore_index=True)
@@ -192,7 +193,7 @@ def save_edit_meal(mn):
     out.to_csv(MEAL_DATA_PATH, index=False)
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
 
-    # Persist message + refresh, then close expander
+    # success + refresh + close editor
     st.session_state["__last_meal_save_msg__"] = f"✅ Saved {nm}"
     st.session_state["__meals_saved__"] = True
     st.session_state["editing_meal"] = None
@@ -203,7 +204,7 @@ def render():
     st.header("🍽️ Meal Builder")
     st.info("Build meals by adding ingredients & set a sell price; then save and edit meals.")
 
-    # show any persisted success message
+    # success message (one-shot)
     msg = st.session_state.pop("__last_meal_save_msg__", None)
     if msg:
         st.success(msg)
@@ -227,7 +228,7 @@ def render():
     st.session_state.setdefault("meal_form_key", str(uuid.uuid4()))
     st.session_state.setdefault("editing_meal", None)
 
-    # If last add asked us to clear, do it BEFORE widgets are created
+    # Clear new-ingredient fields before building widgets
     if st.session_state.pop("__clear_add_fields__", False):
         st.session_state["new_qty"] = 0.0
 
@@ -266,7 +267,7 @@ def render():
             else:
                 save_new_meal()
 
-    # If something was saved/edited/deleted, refresh meals_df so the list below updates immediately
+    # If something was saved/edited/deleted, refresh meals_df so the list updates immediately
     if st.session_state.pop("__meals_saved__", False):
         meals_df = load_meals()
 
@@ -283,77 +284,86 @@ def render():
     st.markdown("---")
     st.subheader("📦 Saved Meals")
 
-    for mn in meals_df["Meal"].unique():
-        if st.session_state["editing_meal"] != mn:
-            if st.button(f"✏️ {mn}", key=f"btn_{mn}"):
-                st.session_state["editing_meal"] = mn
-                tmp = meals_df[meals_df["Meal"] == mn].copy().reset_index(drop=True)
-                # ensure Unit Type exists
-                if "Unit Type" not in tmp.columns:
-                    tmp["Unit Type"] = tmp.apply(
-                        lambda r: load_ingredients().set_index("Ingredient").loc[r["Ingredient"], "Unit Type"], axis=1
-                    )
-                st.session_state[f"edit_{mn}"] = tmp
-                st.session_state.setdefault(f"edit_form_key_{mn}", str(uuid.uuid4()))
-        else:
-            df_edit = st.session_state[f"edit_{mn}"]
-            exp     = st.expander(f"Edit Meal {mn}", expanded=True)
-            with exp:
-                if st.button("🗑️ Delete Meal", key=f"del_{mn}"):
-                    remaining = meals_df[meals_df["Meal"] != mn]
-                    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
-                    remaining.to_csv(MEAL_DATA_PATH, index=False)
-                    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Delete meal")
-                    st.session_state["__last_meal_save_msg__"] = f"🗑️ Deleted {mn}"
-                    st.session_state["editing_meal"] = None
-                    st.session_state["__meals_saved__"] = True
+    # --- Render all edit buttons first ---
+    meals = list(meals_df["Meal"].unique())
+    cols = st.columns(min(3, max(1, len(meals)))) if meals else [st]
+    for i, mn in enumerate(meals):
+        if cols[i % len(cols)].button(f"✏️ {mn}", key=f"btn_{mn}"):
+            # prepare editor state
+            tmp = meals_df[meals_df["Meal"] == mn].copy().reset_index(drop=True)
+            if "Unit Type" not in tmp.columns:
+                tmp["Unit Type"] = tmp.apply(
+                    lambda r: load_ingredients().set_index("Ingredient").loc[r["Ingredient"], "Unit Type"], axis=1
+                )
+            st.session_state[f"edit_{mn}"] = tmp
+            st.session_state.setdefault(f"edit_form_key_{mn}", str(uuid.uuid4()))
+            st.session_state["editing_meal"] = mn
+
+    # --- After buttons, render the active editor (if any) ---
+    active = st.session_state.get("editing_meal")
+    if active:
+        df_edit = st.session_state.get(
+            f"edit_{active}",
+            meals_df[meals_df["Meal"] == active].copy().reset_index(drop=True)
+        )
+        exp = st.expander(f"Edit Meal {active}", expanded=True)
+        with exp:
+            if st.button("🗑️ Delete Meal", key=f"del_{active}"):
+                remaining = meals_df[meals_df["Meal"] != active]
+                os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
+                remaining.to_csv(MEAL_DATA_PATH, index=False)
+                commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Delete meal")
+                st.session_state["__last_meal_save_msg__"] = f"🗑️ Deleted {active}"
+                st.session_state["editing_meal"] = None
+                st.session_state["__meals_saved__"] = True
+                return
+
+            nm = st.text_input("Meal Name", value=active, key=f"rename_{active}")
+            pr = st.number_input(
+                "Sell Price", min_value=0.0, step=0.01,
+                value=float(meals_df.loc[meals_df["Meal"] == active, "Sell Price"].iloc[0]),
+                key=f"sellprice_{active}"
+            )
+
+            st.markdown("### Ingredients")
+            for idx, r in df_edit.iterrows():
+                cols_row = st.columns([3, 2, 2, 1, 1])
+                cols_row[0].write(r["Ingredient"])
+                qty_val, _ = base_to_display(r["Quantity"], r["Unit Type"])
+                cols_row[1].number_input(
+                    "Qty", value=qty_val, min_value=0.0, step=0.1, key=f"qty_{active}_{idx}"
+                )
+                unit_opts = get_display_unit_options(r["Unit Type"])
+                cols_row[2].selectbox(
+                    "Unit", unit_opts, index=unit_opts.index(r["Input Unit"]), key=f"unit_{active}_{idx}"
+                )
+                bq2 = display_to_base(qty_val, r["Input Unit"], r["Unit Type"])
+                tot2 = round(bq2 * float(r["Cost Per Unit"]), 6)
+                cols_row[3].write(f"Cost: ${tot2}")
+                if cols_row[4].button("Remove", key=f"rem_{active}_{idx}"):
+                    df2 = df_edit.drop(idx).reset_index(drop=True)
+                    st.session_state[f"edit_{active}"] = df2
                     return
 
-                nm = st.text_input("Meal Name", value=mn, key=f"rename_{mn}")
-                pr = st.number_input("Sell Price", min_value=0.0, step=0.01,
-                    value=float(meals_df.loc[meals_df["Meal"]==mn, "Sell Price"].iloc[0]),
-                    key=f"sellprice_{mn}")
+            st.markdown("### Add Ingredient")
+            with st.form(key=st.session_state[f"edit_form_key_{active}"]):
+                a1, a2, a3 = st.columns([3, 2, 2])
+                a1.selectbox("Ingredient", opts, key=f"new_ing_edit_{active}")
+                a2.number_input("Qty", min_value=0.0, step=0.1, key=f"new_qty_edit_{active}")
+                b2 = load_ingredients()[load_ingredients()["Ingredient"] == st.session_state[f"new_ing_edit_{active}"]]
+                u2 = get_display_unit_options(b2.iloc[0]["Unit Type"]) if not b2.empty else ["unit"]
+                a3.selectbox("Unit", u2, key=f"new_unit_edit_{active}")
+                if st.form_submit_button("➕ Add Ingredient"):
+                    if not st.session_state[f"new_ing_edit_{active}"]:
+                        st.warning("Select an ingredient.")
+                    elif st.session_state[f"new_qty_edit_{active}"] <= 0:
+                        st.warning("Quantity must be > 0.")
+                    else:
+                        add_edit_callback(active)
 
-                st.markdown("### Ingredients")
-                for idx, r in df_edit.iterrows():
-                    cols   = st.columns([3,2,2,1,1])
-                    cols[0].write(r["Ingredient"])
-                    qty_val,_ = base_to_display(r["Quantity"], r["Unit Type"])
-                    cols[1].number_input("Qty", value=qty_val, min_value=0.0, step=0.1,
-                                         key=f"qty_{mn}_{idx}")
-                    unit_opts = get_display_unit_options(r["Unit Type"])
-                    cols[2].selectbox("Unit", unit_opts,
-                                      index=unit_opts.index(r["Input Unit"]),
-                                      key=f"unit_{mn}_{idx}")
-                    bq2   = display_to_base(qty_val, r["Input Unit"], r["Unit Type"])
-                    tot2  = round(bq2 * float(r["Cost Per Unit"]), 6)
-                    cols[3].write(f"Cost: ${tot2}")
-                    if cols[4].button("Remove", key=f"rem_{mn}_{idx}"):
-                        df2 = df_edit.drop(idx).reset_index(drop=True)
-                        st.session_state[f"edit_{mn}"] = df2
-                        return
-
-                st.markdown("### Add Ingredient")
-                with st.form(key=st.session_state[f"edit_form_key_{mn}"]):
-                    a1,a2,a3 = st.columns([3,2,2])
-                    a1.selectbox("Ingredient", opts, key=f"new_ing_edit_{mn}")
-                    a2.number_input("Qty", min_value=0.0, step=0.1,
-                                    key=f"new_qty_edit_{mn}")
-                    b2 = load_ingredients()[load_ingredients()["Ingredient"]==st.session_state[f"new_ing_edit_{mn}"]]
-                    u2 = get_display_unit_options(b2.iloc[0]["Unit Type"]) if not b2.empty else ["unit"]
-                    a3.selectbox("Unit", u2, key=f"new_unit_edit_{mn}")
-                    add_edit_clicked = st.form_submit_button("➕ Add Ingredient")
-                    if add_edit_clicked:
-                        if not st.session_state[f"new_ing_edit_{mn}"]:
-                            st.warning("Select an ingredient.")
-                        elif st.session_state[f"new_qty_edit_{mn}"] <= 0:
-                            st.warning("Quantity must be > 0.")
-                        else:
-                            add_edit_callback(mn)
-
-                # Save button in main flow (not on_click) so widget values are up-to-date
-                if st.button("💾 Save Changes", key=f"sv_{mn}"):
-                    save_edit_meal(mn)
+            # Save button in normal flow (not on_click)
+            if st.button("💾 Save Changes", key=f"sv_{active}"):
+                save_edit_meal(active)
 
 if __name__ == "__main__":
     render()
