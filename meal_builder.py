@@ -96,12 +96,10 @@ def commit_file_to_github(local_path, repo_path, msg):
 def write_meals(df: pd.DataFrame, commit_msg: str):
     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
     df.to_csv(MEAL_DATA_PATH, index=False)
-    # best-effort GitHub commit; don’t block UI if it fails
     try:
         commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", commit_msg)
     except Exception:
         pass
-    # mark to refresh list on this page
     st.session_state["__meals_saved__"] = True
 
 # New-meal callbacks
@@ -126,7 +124,6 @@ def add_temp():
         [st.session_state["meal_ingredients"], pd.DataFrame([entry])],
         ignore_index=True
     )
-    # Clear next run (avoid mutating widget keys in same cycle)
     st.session_state["__clear_add_fields__"] = True
 
 def save_new_meal():
@@ -139,7 +136,6 @@ def save_new_meal():
 
     write_meals(out, "Update meals")
 
-    # show message on next run, reset draft, rerun
     st.session_state["__last_meal_save_msg__"] = "✅ Meal saved!"
     st.session_state["meal_ingredients"] = pd.DataFrame(
         columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit","Unit Type"]
@@ -147,9 +143,32 @@ def save_new_meal():
     st.session_state["meal_form_key"] = str(uuid.uuid4())
     st.rerun()
 
+# ---- NEW: sync current edit widgets into df before actions that rerun ----
+def _sync_edit_from_widgets(mn: str):
+    """Write current qty/unit widget values back into st.session_state[f'edit_{mn}']."""
+    key = f"edit_{mn}"
+    if key not in st.session_state:
+        return
+    df_edit = st.session_state[key]
+    # Update rows that have widget values present
+    for idx, r in df_edit.iterrows():
+        qkey = f"qty_{mn}_{idx}"
+        ukey = f"unit_{mn}_{idx}"
+        if qkey in st.session_state and ukey in st.session_state:
+            qty_display = st.session_state[qkey]
+            unit_input  = st.session_state[ukey]
+            base_q = display_to_base(qty_display, unit_input, r["Unit Type"])
+            df_edit.at[idx, "Quantity"]   = base_q
+            df_edit.at[idx, "Input Unit"] = unit_input
+            df_edit.at[idx, "Total Cost"] = round(base_q * float(r["Cost Per Unit"]), 6)
+    st.session_state[key] = df_edit
+
 # Edit-meal callbacks
 
 def add_edit_callback(mn):
+    # FIRST capture any inline qty/unit edits so they aren't lost on rerun
+    _sync_edit_from_widgets(mn)
+
     df_edit = st.session_state[f"edit_{mn}"]
     ing_df  = load_ingredients()
     sel     = st.session_state[f"new_ing_edit_{mn}"]
@@ -176,7 +195,7 @@ def add_edit_callback(mn):
 def save_edit_meal(mn):
     df_edit = st.session_state[f"edit_{mn}"]
 
-    # Read latest widget values into df_edit
+    # Read latest widget values into df_edit (kept as before)
     for idx, r in df_edit.iterrows():
         qty_display = st.session_state.get(
             f"qty_{mn}_{idx}",
@@ -193,14 +212,12 @@ def save_edit_meal(mn):
     df_edit["Meal"]       = nm
     df_edit["Sell Price"] = pr
 
-    # Persist
     all_meals = load_meals()
     others    = all_meals[all_meals["Meal"] != mn]
     out       = pd.concat([others, df_edit], ignore_index=True)
 
     write_meals(out, "Save edited meal")
 
-    # success on next run + close editor
     st.session_state["__last_meal_save_msg__"] = f"✅ Saved {nm}"
     st.session_state["editing_meal"] = None
     st.rerun()
@@ -221,14 +238,13 @@ def render():
     st.header("🍽️ Meal Builder")
     st.info("Build meals by adding ingredients & set a sell price; then save and edit meals.")
 
-    # one-shot success message (from last rerun-triggering action)
     msg = st.session_state.pop("__last_meal_save_msg__", None)
     if msg:
         st.success(msg)
 
     meals_df = load_meals()
     ing_df   = load_ingredients()
-    opts     = sorted(ing_df["Ingredient"].unique())
+    opts     = sorted(ig for ig in ing_df["Ingredient"].unique())
 
     # seed new_unit
     if opts:
@@ -245,7 +261,6 @@ def render():
     st.session_state.setdefault("meal_form_key", str(uuid.uuid4()))
     st.session_state.setdefault("editing_meal", None)
 
-    # Clear new-ingredient fields before building widgets
     if st.session_state.pop("__clear_add_fields__", False):
         st.session_state["new_qty"] = 0.0
 
@@ -282,13 +297,11 @@ def render():
             elif not st.session_state["meal_name"].strip():
                 st.warning("Enter a meal name.")
             else:
-                save_new_meal()  # sets message + reruns
+                save_new_meal()
 
-    # If something was saved/edited/deleted, refresh meals_df so the list updates immediately
     if st.session_state.pop("__meals_saved__", False):
         meals_df = load_meals()
 
-    # Preview unsaved
     if not st.session_state["meal_ingredients"].empty:
         st.subheader(f"🧾 Ingredients for '{st.session_state['meal_name']}' (unsaved)")
         df = st.session_state["meal_ingredients"].copy()
@@ -301,12 +314,10 @@ def render():
     st.markdown("---")
     st.subheader("📦 Saved Meals")
 
-    # --- Render all edit buttons first ---
     meals = list(meals_df["Meal"].unique())
     cols = st.columns(min(3, max(1, len(meals)))) if meals else [st]
     for i, mn in enumerate(meals):
         if cols[i % len(cols)].button(f"✏️ {mn}", key=f"btn_{mn}"):
-            # prepare editor state
             tmp = meals_df[meals_df["Meal"] == mn].copy().reset_index(drop=True)
             if "Unit Type" not in tmp.columns:
                 tmp["Unit Type"] = tmp.apply(
@@ -316,7 +327,6 @@ def render():
             st.session_state.setdefault(f"edit_form_key_{mn}", str(uuid.uuid4()))
             st.session_state["editing_meal"] = mn
 
-    # --- After buttons, render the active editor (if any) ---
     active = st.session_state.get("editing_meal")
     if active:
         df_edit = st.session_state.get(
@@ -369,10 +379,10 @@ def render():
                     elif st.session_state[f"new_qty_edit_{active}"] <= 0:
                         st.warning("Quantity must be > 0.")
                     else:
-                        add_edit_callback(active)  # triggers rerun
+                        add_edit_callback(active)  # sync + append + rerun
 
             if st.button("💾 Save Changes", key=f"sv_{active}"):
-                save_edit_meal(active)  # sets message + reruns
+                save_edit_meal(active)
 
 if __name__ == "__main__":
     render()
