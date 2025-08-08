@@ -1,7 +1,7 @@
 Meal,Ingredient,Quantity,Cost Per Unit,Total Cost,Input Unit,Unit Type,Sell Price
+TestMeal,Baby Beans,1.0,4.855,4.855,kg,KG,12.0
+TestMeal,Baby Beans,1.0,4.855,4.855,kg,KG,12.0
 Chicken with Vegetables,Breast Fillet (No Skin Italian Marinated),0.135,8.9,1.2015,g,KG,12.0
 Chicken with Vegetables,Corn Kernals,0.052,2.857627118644068,0.148597,g,KG,12.0
 Chicken with Vegetables,Baby Beans,0.06,4.855,0.2913,g,KG,12.0
 Chicken with Vegetables,Broccoli,0.067,3.125,0.209375,g,KG,12.0
-TestMeal,Baby Beans,1.0,4.855,4.855,kg,KG,12.0
-TestMeal,Baby Beans,1.0,4.855,4.855,kg,KG,12.0
