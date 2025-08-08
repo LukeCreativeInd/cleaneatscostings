@@ -217,8 +217,26 @@ def render():
         uopts= get_display_unit_options(ut)
         d3.selectbox("Unit", uopts, key="new_unit")
 
-        d4.form_submit_button("➕ Add Ingredient", on_click=add_temp)
-        c1.form_submit_button("💾 Save Meal",     on_click=save_new_meal)
+        add_clicked  = d4.form_submit_button("➕ Add Ingredient")
+        save_clicked = c1.form_submit_button("💾 Save Meal")
+
+        if add_clicked:
+            if not st.session_state["meal_name"].strip():
+                st.warning("Enter a meal name first.")
+            elif st.session_state["new_qty"] <= 0:
+                st.warning("Quantity must be > 0.")
+            elif not st.session_state["new_ing"]:
+                st.warning("Select an ingredient.")
+            else:
+                add_temp()
+
+        if save_clicked:
+            if st.session_state["meal_ingredients"].empty:
+                st.warning("Add at least one ingredient before saving.")
+            elif not st.session_state["meal_name"].strip():
+                st.warning("Enter a meal name.")
+            else:
+                save_new_meal()
 
     # Preview unsaved
     if not st.session_state["meal_ingredients"].empty:
@@ -291,7 +309,14 @@ def render():
                     b2 = ing_df[ing_df["Ingredient"]==st.session_state[f"new_ing_edit_{mn}"]]
                     u2 = get_display_unit_options(b2.iloc[0]["Unit Type"]) if not b2.empty else ["unit"]
                     a3.selectbox("Unit", u2, key=f"new_unit_edit_{mn}")
-                    st.form_submit_button("➕ Add Ingredient", on_click=add_edit_callback, args=(mn,))
+                    add_edit_clicked = st.form_submit_button("➕ Add Ingredient")
+                    if add_edit_clicked:
+                        if not st.session_state[f"new_ing_edit_{mn}"]:
+                            st.warning("Select an ingredient.")
+                        elif st.session_state[f"new_qty_edit_{mn}"] <= 0:
+                            st.warning("Quantity must be > 0.")
+                        else:
+                            add_edit_callback(mn)
 
                 st.button("💾 Save Changes", key=f"sv_{mn}", on_click=save_edit_meal, args=(mn,))
 
