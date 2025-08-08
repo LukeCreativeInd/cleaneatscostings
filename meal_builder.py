@@ -42,6 +42,9 @@ def load_meals():
     if os.path.exists(MEAL_DATA_PATH):
         df = pd.read_csv(MEAL_DATA_PATH)
         df.columns = df.columns.str.strip()
+        # Normalize column naming just in case
+        if "Cost per Unit" in df.columns and "Cost Per Unit" not in df.columns:
+            df = df.rename(columns={"Cost per Unit": "Cost Per Unit"})
         if "Sell Price" not in df.columns:
             df["Sell Price"] = 0.0
         return df
@@ -143,32 +146,29 @@ def save_new_meal():
     st.session_state["meal_form_key"] = str(uuid.uuid4())
     st.rerun()
 
-# ---- NEW: sync current edit widgets into df before actions that rerun ----
-def _sync_edit_from_widgets(mn: str):
-    """Write current qty/unit widget values back into st.session_state[f'edit_{mn}']."""
+# ---- NEW: live-sync a single edit row when qty/unit changes ----
+def update_edit_row(mn: str, idx: int):
     key = f"edit_{mn}"
     if key not in st.session_state:
         return
     df_edit = st.session_state[key]
-    # Update rows that have widget values present
-    for idx, r in df_edit.iterrows():
-        qkey = f"qty_{mn}_{idx}"
-        ukey = f"unit_{mn}_{idx}"
-        if qkey in st.session_state and ukey in st.session_state:
-            qty_display = st.session_state[qkey]
-            unit_input  = st.session_state[ukey]
-            base_q = display_to_base(qty_display, unit_input, r["Unit Type"])
-            df_edit.at[idx, "Quantity"]   = base_q
-            df_edit.at[idx, "Input Unit"] = unit_input
-            df_edit.at[idx, "Total Cost"] = round(base_q * float(r["Cost Per Unit"]), 6)
-    st.session_state[key] = df_edit
+    # Current widget values
+    qkey = f"qty_{mn}_{idx}"
+    ukey = f"unit_{mn}_{idx}"
+    if qkey in st.session_state and ukey in st.session_state:
+        qty_display = st.session_state[qkey]
+        unit_input  = st.session_state[ukey]
+        ut = df_edit.at[idx, "Unit Type"]
+        base_q = display_to_base(qty_display, unit_input, ut)
+        df_edit.at[idx, "Quantity"]   = base_q
+        df_edit.at[idx, "Input Unit"] = unit_input
+        df_edit.at[idx, "Total Cost"] = round(base_q * float(df_edit.at[idx, "Cost Per Unit"]), 6)
+        st.session_state[key] = df_edit  # persist updates
 
 # Edit-meal callbacks
 
 def add_edit_callback(mn):
-    # FIRST capture any inline qty/unit edits so they aren't lost on rerun
-    _sync_edit_from_widgets(mn)
-
+    # Append the new row (existing rows already live-sync via update_edit_row)
     df_edit = st.session_state[f"edit_{mn}"]
     ing_df  = load_ingredients()
     sel     = st.session_state[f"new_ing_edit_{mn}"]
@@ -193,19 +193,8 @@ def add_edit_callback(mn):
     st.rerun()
 
 def save_edit_meal(mn):
+    # df_edit has already been kept in sync by update_edit_row
     df_edit = st.session_state[f"edit_{mn}"]
-
-    # Read latest widget values into df_edit (kept as before)
-    for idx, r in df_edit.iterrows():
-        qty_display = st.session_state.get(
-            f"qty_{mn}_{idx}",
-            base_to_display(r["Quantity"], r["Unit Type"])[0]
-        )
-        unit_input  = st.session_state.get(f"unit_{mn}_{idx}", r["Input Unit"])
-        base_q = display_to_base(qty_display, unit_input, r["Unit Type"])
-        df_edit.at[idx, "Quantity"]   = base_q
-        df_edit.at[idx, "Input Unit"] = unit_input
-        df_edit.at[idx, "Total Cost"] = round(base_q * float(r["Cost Per Unit"]), 6)
 
     nm  = st.session_state[f"rename_{mn}"].strip() or mn
     pr  = st.session_state[f"sellprice_{mn}"]
@@ -351,14 +340,20 @@ def render():
                 cols_row[0].write(r["Ingredient"])
                 qty_val, _ = base_to_display(r["Quantity"], r["Unit Type"])
                 cols_row[1].number_input(
-                    "Qty", value=qty_val, min_value=0.0, step=0.1, key=f"qty_{active}_{idx}"
+                    "Qty",
+                    value=qty_val, min_value=0.0, step=0.1,
+                    key=f"qty_{active}_{idx}",
+                    on_change=update_edit_row, args=(active, idx)
                 )
                 unit_opts = get_display_unit_options(r["Unit Type"])
                 cols_row[2].selectbox(
-                    "Unit", unit_opts, index=unit_opts.index(r["Input Unit"]), key=f"unit_{active}_{idx}"
+                    "Unit", unit_opts, index=unit_opts.index(r["Input Unit"]),
+                    key=f"unit_{active}_{idx}",
+                    on_change=update_edit_row, args=(active, idx)
                 )
-                bq2 = display_to_base(qty_val, r["Input Unit"], r["Unit Type"])
-                tot2 = round(bq2 * float(r["Cost Per Unit"]), 6)
+                # display computed cost live (based on current df_edit values)
+                bq2   = df_edit.at[idx, "Quantity"]
+                tot2  = round(bq2 * float(df_edit.at[idx, "Cost Per Unit"]), 6)
                 cols_row[3].write(f"Cost: ${tot2}")
                 if cols_row[4].button("Remove", key=f"rem_{active}_{idx}"):
                     df2 = df_edit.drop(idx).reset_index(drop=True)
@@ -379,7 +374,7 @@ def render():
                     elif st.session_state[f"new_qty_edit_{active}"] <= 0:
                         st.warning("Quantity must be > 0.")
                     else:
-                        add_edit_callback(active)  # sync + append + rerun
+                        add_edit_callback(active)  # append + rerun
 
             if st.button("💾 Save Changes", key=f"sv_{active}"):
                 save_edit_meal(active)
