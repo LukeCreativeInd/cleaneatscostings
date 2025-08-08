@@ -71,10 +71,10 @@ def load_ingredients():
 
 def commit_file_to_github(local_path, repo_path, msg):
     try:
-        token = st.secrets["github_token"]
-        repo  = st.secrets["github_repo"]
+        token  = st.secrets["github_token"]
+        repo   = st.secrets["github_repo"]
         branch = st.secrets.get("github_branch","main")
-    except:
+    except Exception:
         return
     url = f"https://api.github.com/repos/{repo}/contents/{repo_path}"
     headers = {
@@ -85,16 +85,24 @@ def commit_file_to_github(local_path, repo_path, msg):
         content = base64.b64encode(f.read()).decode()
     resp = requests.get(url, headers=headers, params={"ref": branch})
     sha  = resp.json().get("sha") if resp.status_code == 200 else None
-    payload = {
-        "message": f"{msg} {datetime.utcnow().isoformat()}Z",
-        "content": content,
-        "branch": branch
-    }
+    payload = {"message": f"{msg} {datetime.utcnow().isoformat()}Z",
+               "content": content, "branch": branch}
     if sha:
         payload["sha"] = sha
-    put = requests.put(url, headers=headers, json=payload)
-    if put.status_code not in (200,201):
-        st.error(f"GitHub commit failed: {put.status_code}")
+    requests.put(url, headers=headers, json=payload)
+
+# ---- Centralized writer ----
+
+def write_meals(df: pd.DataFrame, commit_msg: str):
+    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
+    df.to_csv(MEAL_DATA_PATH, index=False)
+    # best-effort GitHub commit; don’t block UI if it fails
+    try:
+        commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", commit_msg)
+    except Exception:
+        pass
+    # mark to refresh list on this page
+    st.session_state["__meals_saved__"] = True
 
 # New-meal callbacks
 
@@ -128,11 +136,10 @@ def save_new_meal():
     temp["Meal"]       = name
     temp["Sell Price"] = st.session_state["meal_sell_price"]
     out  = pd.concat([mdf, temp], ignore_index=True)
-    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
-    out.to_csv(MEAL_DATA_PATH, index=False)
-    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
-    # refresh + reset draft + show message on next run
-    st.session_state["__meals_saved__"] = True
+
+    write_meals(out, "Update meals")
+
+    # show message on next run, reset draft, rerun
     st.session_state["__last_meal_save_msg__"] = "✅ Meal saved!"
     st.session_state["meal_ingredients"] = pd.DataFrame(
         columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit","Unit Type"]
@@ -164,7 +171,6 @@ def add_edit_callback(mn):
         ignore_index=True
     )
     st.session_state[f"edit_form_key_{mn}"] = str(uuid.uuid4())
-    # Immediately show the new row on the same click
     st.rerun()
 
 def save_edit_meal(mn):
@@ -191,25 +197,21 @@ def save_edit_meal(mn):
     all_meals = load_meals()
     others    = all_meals[all_meals["Meal"] != mn]
     out       = pd.concat([others, df_edit], ignore_index=True)
-    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
-    out.to_csv(MEAL_DATA_PATH, index=False)
-    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
 
-    # success on next run + refresh + close editor
+    write_meals(out, "Save edited meal")
+
+    # success on next run + close editor
     st.session_state["__last_meal_save_msg__"] = f"✅ Saved {nm}"
-    st.session_state["__meals_saved__"] = True
     st.session_state["editing_meal"] = None
     st.rerun()
 
 def delete_meal(mn: str):
-    """Delete the given meal from CSV + GitHub, show a success message, and rerun."""
     all_meals = load_meals()
     remaining = all_meals[all_meals["Meal"] != mn]
-    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
-    remaining.to_csv(MEAL_DATA_PATH, index=False)
-    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", f"Delete meal {mn}")
+
+    write_meals(remaining, f"Delete meal {mn}")
+
     st.session_state["__last_meal_save_msg__"] = f"🗑️ Deleted {mn}"
-    st.session_state["__meals_saved__"] = True
     st.session_state["editing_meal"] = None
     st.rerun()
 
@@ -367,9 +369,8 @@ def render():
                     elif st.session_state[f"new_qty_edit_{active}"] <= 0:
                         st.warning("Quantity must be > 0.")
                     else:
-                        add_edit_callback(active)  # triggers st.rerun()
+                        add_edit_callback(active)  # triggers rerun
 
-            # Save button (triggers rerun to close editor immediately)
             if st.button("💾 Save Changes", key=f"sv_{active}"):
                 save_edit_meal(active)  # sets message + reruns
 
