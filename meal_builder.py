@@ -131,12 +131,12 @@ def save_new_meal():
     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
     out.to_csv(MEAL_DATA_PATH, index=False)
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
-    st.success("✅ Meal saved!")
+    # message and refresh flag
+    st.session_state["__last_meal_save_msg__"] = "✅ Meal saved!"
     st.session_state["meal_ingredients"] = pd.DataFrame(
         columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit","Unit Type"]
     )
     st.session_state["meal_form_key"] = str(uuid.uuid4())
-    # tell render() to refresh meals list
     st.session_state["__meals_saved__"] = True
 
 # Edit-meal callbacks
@@ -165,21 +165,20 @@ def add_edit_callback(mn):
     st.session_state[f"edit_form_key_{mn}"] = str(uuid.uuid4())
 
 def save_edit_meal(mn):
-    # Pull current edit frame
     df_edit = st.session_state[f"edit_{mn}"]
 
-    # Read the latest widget values for each row and update df_edit
+    # Read latest widget values for each row and update df_edit
     for idx, r in df_edit.iterrows():
-        # current widget values (fall back to original)
-        qty_display = st.session_state.get(f"qty_{mn}_{idx}", base_to_display(r["Quantity"], r["Unit Type"])[0])
+        qty_display = st.session_state.get(
+            f"qty_{mn}_{idx}",
+            base_to_display(r["Quantity"], r["Unit Type"])[0]
+        )
         unit_input  = st.session_state.get(f"unit_{mn}_{idx}", r["Input Unit"])
-        # convert back to base units
         base_q = display_to_base(qty_display, unit_input, r["Unit Type"])
-        df_edit.at[idx, "Quantity"]  = base_q
+        df_edit.at[idx, "Quantity"]   = base_q
         df_edit.at[idx, "Input Unit"] = unit_input
         df_edit.at[idx, "Total Cost"] = round(base_q * float(r["Cost Per Unit"]), 6)
 
-    # Rename/sell price
     nm  = st.session_state[f"rename_{mn}"].strip() or mn
     pr  = st.session_state[f"sellprice_{mn}"]
     df_edit["Meal"]       = nm
@@ -192,15 +191,22 @@ def save_edit_meal(mn):
     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
     out.to_csv(MEAL_DATA_PATH, index=False)
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
-    st.success(f"✅ Saved {nm}")
-    st.session_state["editing_meal"] = None
+
+    # Persist message + refresh, then close expander
+    st.session_state["__last_meal_save_msg__"] = f"✅ Saved {nm}"
     st.session_state["__meals_saved__"] = True
+    st.session_state["editing_meal"] = None
 
 # Main UI
 
 def render():
     st.header("🍽️ Meal Builder")
     st.info("Build meals by adding ingredients & set a sell price; then save and edit meals.")
+
+    # show any persisted success message
+    msg = st.session_state.pop("__last_meal_save_msg__", None)
+    if msg:
+        st.success(msg)
 
     meals_df = load_meals()
     ing_df   = load_ingredients()
@@ -298,7 +304,7 @@ def render():
                     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
                     remaining.to_csv(MEAL_DATA_PATH, index=False)
                     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Delete meal")
-                    st.success(f"Deleted {mn}")
+                    st.session_state["__last_meal_save_msg__"] = f"🗑️ Deleted {mn}"
                     st.session_state["editing_meal"] = None
                     st.session_state["__meals_saved__"] = True
                     return
@@ -345,7 +351,9 @@ def render():
                         else:
                             add_edit_callback(mn)
 
-                st.button("💾 Save Changes", key=f"sv_{mn}", on_click=save_edit_meal, args=(mn,))
+                # Save button in main flow (not on_click) so widget values are up-to-date
+                if st.button("💾 Save Changes", key=f"sv_{mn}"):
+                    save_edit_meal(mn)
 
 if __name__ == "__main__":
     render()
