@@ -42,7 +42,7 @@ def load_meals():
     if os.path.exists(MEAL_DATA_PATH):
         df = pd.read_csv(MEAL_DATA_PATH)
         df.columns = df.columns.str.strip()
-        # Normalize any older header
+        # Normalize header variants
         if "Cost per Unit" in df.columns and "Cost Per Unit" not in df.columns:
             df = df.rename(columns={"Cost per Unit": "Cost Per Unit"})
         if "Sell Price" not in df.columns:
@@ -80,16 +80,12 @@ def commit_file_to_github(local_path, repo_path, msg):
     except Exception:
         return
     url = f"https://api.github.com/repos/{repo}/contents/{repo_path}"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json"
-    }
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
     with open(local_path, "rb") as f:
         content = base64.b64encode(f.read()).decode()
     resp = requests.get(url, headers=headers, params={"ref": branch})
     sha  = resp.json().get("sha") if resp.status_code == 200 else None
-    payload = {"message": f"{msg} {datetime.utcnow().isoformat()}Z",
-               "content": content, "branch": branch}
+    payload = {"message": f"{msg} {datetime.utcnow().isoformat()}Z", "content": content, "branch": branch}
     if sha:
         payload["sha"] = sha
     requests.put(url, headers=headers, json=payload)
@@ -99,6 +95,7 @@ def commit_file_to_github(local_path, repo_path, msg):
 def write_meals(df: pd.DataFrame, commit_msg: str):
     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
     df.to_csv(MEAL_DATA_PATH, index=False)
+    # best-effort commit
     try:
         commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", commit_msg)
     except Exception:
@@ -136,9 +133,7 @@ def save_new_meal():
     temp["Meal"]       = name
     temp["Sell Price"] = st.session_state["meal_sell_price"]
     out  = pd.concat([mdf, temp], ignore_index=True)
-
     write_meals(out, "Update meals")
-
     st.session_state["__last_meal_save_msg__"] = "✅ Meal saved!"
     st.session_state["meal_ingredients"] = pd.DataFrame(
         columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit","Unit Type"]
@@ -169,9 +164,8 @@ def _sync_edit_from_widgets(mn: str):
 # Edit-meal callbacks
 
 def add_edit_callback(mn):
-    # ✅ ensure any inline edits are captured before we append
+    # capture inline edits first
     _sync_edit_from_widgets(mn)
-
     df_edit = st.session_state[f"edit_{mn}"]
     ing_df  = load_ingredients()
     sel     = st.session_state[f"new_ing_edit_{mn}"]
@@ -188,31 +182,22 @@ def add_edit_callback(mn):
         "Input Unit":    st.session_state[f"new_unit_edit_{mn}"],
         "Unit Type":     row2["Unit Type"]
     }
-    st.session_state[f"edit_{mn}"] = pd.concat(
-        [df_edit, pd.DataFrame([newrow])],
-        ignore_index=True
-    )
-    # clear add inputs for next run
-    st.session_state[f"new_qty_edit_{mn}"] = 0.0
-    # NOTE: no st.rerun() here — the button click already triggers a rerun
+    st.session_state[f"edit_{mn}"] = pd.concat([df_edit, pd.DataFrame([newrow])], ignore_index=True)
+    # clear add inputs on next run (before widgets are made)
+    st.session_state[f"__clear_edit_add_{mn}"] = True
+    st.rerun()
 
 def save_edit_meal(mn):
-    # ✅ capture any pending inline edits right before persist
     _sync_edit_from_widgets(mn)
-
     df_edit = st.session_state[f"edit_{mn}"]
-
     nm  = st.session_state[f"rename_{mn}"].strip() or mn
     pr  = st.session_state[f"sellprice_{mn}"]
     df_edit["Meal"]       = nm
     df_edit["Sell Price"] = pr
-
     all_meals = load_meals()
     others    = all_meals[all_meals["Meal"] != mn]
     out       = pd.concat([others, df_edit], ignore_index=True)
-
     write_meals(out, "Save edited meal")
-
     st.session_state["__last_meal_save_msg__"] = f"✅ Saved {nm}"
     st.session_state["editing_meal"] = None
     st.rerun()
@@ -220,9 +205,7 @@ def save_edit_meal(mn):
 def delete_meal(mn: str):
     all_meals = load_meals()
     remaining = all_meals[all_meals["Meal"] != mn]
-
     write_meals(remaining, f"Delete meal {mn}")
-
     st.session_state["__last_meal_save_msg__"] = f"🗑️ Deleted {mn}"
     st.session_state["editing_meal"] = None
     st.rerun()
@@ -357,7 +340,6 @@ def render():
                     key=f"unit_{active}_{idx}",
                     on_change=_sync_edit_from_widgets, args=(active,)
                 )
-                # Display the cost from the synced df (live)
                 current_qty = df_edit.at[idx, "Quantity"]
                 tot2 = round(current_qty * float(df_edit.at[idx, "Cost Per Unit"]), 6)
                 cols_row[3].write(f"Cost: ${tot2}")
@@ -366,8 +348,14 @@ def render():
                     st.session_state[f"edit_{active}"] = df2
                     st.rerun()
 
+            # ✅ clear the add-ingredient fields on rerun BEFORE we instantiate those widgets
+            if st.session_state.pop(f"__clear_edit_add_{active}", False):
+                st.session_state[f"new_qty_edit_{active}"] = 0.0
+                # Optional: also reset ingredient/unit if you want baseline defaults:
+                # st.session_state[f"new_ing_edit_{active}"] = ""
+                # st.session_state[f"new_unit_edit_{active}"] = get_display_unit_options("KG")[0]
+
             st.markdown("### Add Ingredient")
-            # (Switched from form to regular widgets + button to avoid rerun races)
             a1, a2, a3, a4 = st.columns([3, 2, 2, 1])
             a1.selectbox("Ingredient", opts, key=f"new_ing_edit_{active}")
             a2.number_input("Qty", min_value=0.0, step=0.1, key=f"new_qty_edit_{active}")
@@ -380,7 +368,7 @@ def render():
                 elif st.session_state[f"new_qty_edit_{active}"] <= 0:
                     st.warning("Quantity must be > 0.")
                 else:
-                    add_edit_callback(active)  # append; no explicit rerun here
+                    add_edit_callback(active)
 
             if st.button("💾 Save Changes", key=f"sv_{active}"):
                 save_edit_meal(active)
