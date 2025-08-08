@@ -131,13 +131,14 @@ def save_new_meal():
     os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
     out.to_csv(MEAL_DATA_PATH, index=False)
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Update meals")
-    # refresh + reset draft
+    # refresh + reset draft + show message on next run
     st.session_state["__meals_saved__"] = True
+    st.session_state["__last_meal_save_msg__"] = "✅ Meal saved!"
     st.session_state["meal_ingredients"] = pd.DataFrame(
         columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit","Unit Type"]
     )
     st.session_state["meal_form_key"] = str(uuid.uuid4())
-    return "✅ Meal saved!"
+    st.rerun()
 
 # Edit-meal callbacks
 
@@ -163,6 +164,8 @@ def add_edit_callback(mn):
         ignore_index=True
     )
     st.session_state[f"edit_form_key_{mn}"] = str(uuid.uuid4())
+    # Immediately show the new row on the same click
+    st.rerun()
 
 def save_edit_meal(mn):
     df_edit = st.session_state[f"edit_{mn}"]
@@ -192,16 +195,22 @@ def save_edit_meal(mn):
     out.to_csv(MEAL_DATA_PATH, index=False)
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
 
-    # refresh + close editor
+    # success on next run + refresh + close editor
+    st.session_state["__last_meal_save_msg__"] = f"✅ Saved {nm}"
     st.session_state["__meals_saved__"] = True
     st.session_state["editing_meal"] = None
-    return f"✅ Saved {nm}"
+    st.rerun()
 
 # Main UI
 
 def render():
     st.header("🍽️ Meal Builder")
     st.info("Build meals by adding ingredients & set a sell price; then save and edit meals.")
+
+    # one-shot success message (from last rerun-triggering action)
+    msg = st.session_state.pop("__last_meal_save_msg__", None)
+    if msg:
+        st.success(msg)
 
     meals_df = load_meals()
     ing_df   = load_ingredients()
@@ -259,8 +268,7 @@ def render():
             elif not st.session_state["meal_name"].strip():
                 st.warning("Enter a meal name.")
             else:
-                msg = save_new_meal()
-                st.success(msg)
+                save_new_meal()  # sets message + reruns
 
     # If something was saved/edited/deleted, refresh meals_df so the list updates immediately
     if st.session_state.pop("__meals_saved__", False):
@@ -308,10 +316,10 @@ def render():
                 os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
                 remaining.to_csv(MEAL_DATA_PATH, index=False)
                 commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Delete meal")
+                st.session_state["__last_meal_save_msg__"] = f"🗑️ Deleted {active}"
                 st.session_state["__meals_saved__"] = True
                 st.session_state["editing_meal"] = None
-                st.success(f"🗑️ Deleted {active}")
-                return
+                st.rerun()
 
             nm = st.text_input("Meal Name", value=active, key=f"rename_{active}")
             pr = st.number_input(
@@ -338,7 +346,7 @@ def render():
                 if cols_row[4].button("Remove", key=f"rem_{active}_{idx}"):
                     df2 = df_edit.drop(idx).reset_index(drop=True)
                     st.session_state[f"edit_{active}"] = df2
-                    return
+                    st.experimental_rerun()  # NOTE: if using Streamlit >=1.28, replace with st.rerun()
 
             st.markdown("### Add Ingredient")
             with st.form(key=st.session_state[f"edit_form_key_{active}"]):
@@ -354,12 +362,11 @@ def render():
                     elif st.session_state[f"new_qty_edit_{active}"] <= 0:
                         st.warning("Quantity must be > 0.")
                     else:
-                        add_edit_callback(active)
+                        add_edit_callback(active)  # triggers st.rerun()
 
-            # Save button in normal flow (not on_click) so widget values are up-to-date
+            # Save button (triggers rerun to close editor immediately)
             if st.button("💾 Save Changes", key=f"sv_{active}"):
-                msg = save_edit_meal(active)
-                st.success(msg)
+                save_edit_meal(active)  # sets message + reruns
 
 if __name__ == "__main__":
     render()
