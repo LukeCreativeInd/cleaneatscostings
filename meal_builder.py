@@ -118,9 +118,9 @@ def add_temp():
         [st.session_state["meal_ingredients"], pd.DataFrame([entry])],
         ignore_index=True
     )
-    # clear only entry fields
-    st.session_state["new_ing"] = ""
-    st.session_state["new_qty"] = 0.0
+    # Instead of mutating widget keys here (causes exception),
+    # drop a flag so we clear next run before widgets are created.
+    st.session_state["__clear_add_fields__"] = True
 
 def save_new_meal():
     mdf  = load_meals()
@@ -202,6 +202,11 @@ def render():
     ))
     st.session_state.setdefault("meal_form_key", str(uuid.uuid4()))
     st.session_state.setdefault("editing_meal", None)
+
+    # If last click asked us to clear, do it BEFORE widgets are created
+    if st.session_state.pop("__clear_add_fields__", False):
+        # safe to clear qty here; avoid touching selectbox value to prevent invalid value errors
+        st.session_state["new_qty"] = 0.0
 
     # New meal form
     with st.form(key=st.session_state["meal_form_key"]):
