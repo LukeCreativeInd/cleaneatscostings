@@ -118,8 +118,7 @@ def add_temp():
         [st.session_state["meal_ingredients"], pd.DataFrame([entry])],
         ignore_index=True
     )
-    # Instead of mutating widget keys here (causes exception),
-    # drop a flag so we clear next run before widgets are created.
+    # Clear on the next run (avoid mutating widget keys in the same cycle)
     st.session_state["__clear_add_fields__"] = True
 
 def save_new_meal():
@@ -137,6 +136,8 @@ def save_new_meal():
         columns=["Ingredient","Quantity","Cost Per Unit","Total Cost","Input Unit","Unit Type"]
     )
     st.session_state["meal_form_key"] = str(uuid.uuid4())
+    # tell render() to refresh meals list
+    st.session_state["__meals_saved__"] = True
 
 # Edit-meal callbacks
 
@@ -164,11 +165,27 @@ def add_edit_callback(mn):
     st.session_state[f"edit_form_key_{mn}"] = str(uuid.uuid4())
 
 def save_edit_meal(mn):
+    # Pull current edit frame
     df_edit = st.session_state[f"edit_{mn}"]
+
+    # Read the latest widget values for each row and update df_edit
+    for idx, r in df_edit.iterrows():
+        # current widget values (fall back to original)
+        qty_display = st.session_state.get(f"qty_{mn}_{idx}", base_to_display(r["Quantity"], r["Unit Type"])[0])
+        unit_input  = st.session_state.get(f"unit_{mn}_{idx}", r["Input Unit"])
+        # convert back to base units
+        base_q = display_to_base(qty_display, unit_input, r["Unit Type"])
+        df_edit.at[idx, "Quantity"]  = base_q
+        df_edit.at[idx, "Input Unit"] = unit_input
+        df_edit.at[idx, "Total Cost"] = round(base_q * float(r["Cost Per Unit"]), 6)
+
+    # Rename/sell price
     nm  = st.session_state[f"rename_{mn}"].strip() or mn
     pr  = st.session_state[f"sellprice_{mn}"]
     df_edit["Meal"]       = nm
     df_edit["Sell Price"] = pr
+
+    # Persist to CSV
     all_meals = load_meals()
     others    = all_meals[all_meals["Meal"] != mn]
     out       = pd.concat([others, df_edit], ignore_index=True)
@@ -177,6 +194,7 @@ def save_edit_meal(mn):
     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Save edited meal")
     st.success(f"✅ Saved {nm}")
     st.session_state["editing_meal"] = None
+    st.session_state["__meals_saved__"] = True
 
 # Main UI
 
@@ -203,9 +221,8 @@ def render():
     st.session_state.setdefault("meal_form_key", str(uuid.uuid4()))
     st.session_state.setdefault("editing_meal", None)
 
-    # If last click asked us to clear, do it BEFORE widgets are created
+    # If last add asked us to clear, do it BEFORE widgets are created
     if st.session_state.pop("__clear_add_fields__", False):
-        # safe to clear qty here; avoid touching selectbox value to prevent invalid value errors
         st.session_state["new_qty"] = 0.0
 
     # New meal form
@@ -243,6 +260,10 @@ def render():
             else:
                 save_new_meal()
 
+    # If something was saved/edited/deleted, refresh meals_df so the list below updates immediately
+    if st.session_state.pop("__meals_saved__", False):
+        meals_df = load_meals()
+
     # Preview unsaved
     if not st.session_state["meal_ingredients"].empty:
         st.subheader(f"🧾 Ingredients for '{st.session_state['meal_name']}' (unsaved)")
@@ -264,7 +285,7 @@ def render():
                 # ensure Unit Type exists
                 if "Unit Type" not in tmp.columns:
                     tmp["Unit Type"] = tmp.apply(
-                        lambda r: ing_df.set_index("Ingredient").loc[r["Ingredient"], "Unit Type"], axis=1
+                        lambda r: load_ingredients().set_index("Ingredient").loc[r["Ingredient"], "Unit Type"], axis=1
                     )
                 st.session_state[f"edit_{mn}"] = tmp
                 st.session_state.setdefault(f"edit_form_key_{mn}", str(uuid.uuid4()))
@@ -279,6 +300,7 @@ def render():
                     commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Delete meal")
                     st.success(f"Deleted {mn}")
                     st.session_state["editing_meal"] = None
+                    st.session_state["__meals_saved__"] = True
                     return
 
                 nm = st.text_input("Meal Name", value=mn, key=f"rename_{mn}")
@@ -311,7 +333,7 @@ def render():
                     a1.selectbox("Ingredient", opts, key=f"new_ing_edit_{mn}")
                     a2.number_input("Qty", min_value=0.0, step=0.1,
                                     key=f"new_qty_edit_{mn}")
-                    b2 = ing_df[ing_df["Ingredient"]==st.session_state[f"new_ing_edit_{mn}"]]
+                    b2 = load_ingredients()[load_ingredients()["Ingredient"]==st.session_state[f"new_ing_edit_{mn}"]]
                     u2 = get_display_unit_options(b2.iloc[0]["Unit Type"]) if not b2.empty else ["unit"]
                     a3.selectbox("Unit", u2, key=f"new_unit_edit_{mn}")
                     add_edit_clicked = st.form_submit_button("➕ Add Ingredient")
