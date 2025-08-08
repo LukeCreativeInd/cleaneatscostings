@@ -201,6 +201,18 @@ def save_edit_meal(mn):
     st.session_state["editing_meal"] = None
     st.rerun()
 
+def delete_meal(mn: str):
+    """Delete the given meal from CSV + GitHub, show a success message, and rerun."""
+    all_meals = load_meals()
+    remaining = all_meals[all_meals["Meal"] != mn]
+    os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
+    remaining.to_csv(MEAL_DATA_PATH, index=False)
+    commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", f"Delete meal {mn}")
+    st.session_state["__last_meal_save_msg__"] = f"🗑️ Deleted {mn}"
+    st.session_state["__meals_saved__"] = True
+    st.session_state["editing_meal"] = None
+    st.rerun()
+
 # Main UI
 
 def render():
@@ -312,14 +324,7 @@ def render():
         exp = st.expander(f"Edit Meal {active}", expanded=True)
         with exp:
             if st.button("🗑️ Delete Meal", key=f"del_{active}"):
-                remaining = meals_df[meals_df["Meal"] != active]
-                os.makedirs(os.path.dirname(MEAL_DATA_PATH), exist_ok=True)
-                remaining.to_csv(MEAL_DATA_PATH, index=False)
-                commit_file_to_github(MEAL_DATA_PATH, "data/meals.csv", "Delete meal")
-                st.session_state["__last_meal_save_msg__"] = f"🗑️ Deleted {active}"
-                st.session_state["__meals_saved__"] = True
-                st.session_state["editing_meal"] = None
-                st.rerun()
+                delete_meal(active)
 
             nm = st.text_input("Meal Name", value=active, key=f"rename_{active}")
             pr = st.number_input(
@@ -346,7 +351,7 @@ def render():
                 if cols_row[4].button("Remove", key=f"rem_{active}_{idx}"):
                     df2 = df_edit.drop(idx).reset_index(drop=True)
                     st.session_state[f"edit_{active}"] = df2
-                    st.experimental_rerun()  # NOTE: if using Streamlit >=1.28, replace with st.rerun()
+                    st.rerun()
 
             st.markdown("### Add Ingredient")
             with st.form(key=st.session_state[f"edit_form_key_{active}"]):
